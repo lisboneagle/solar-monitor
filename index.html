@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☀️ Solar Energy Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0F172A;
+    --card: #1E293B;
+    --border: #334155;
+    --text: #F1F5F9;
+    --muted: #94A3B8;
+    --amber: #F59E0B;
+    --orange: #F97316;
+    --blue: #3B82F6;
+    --red: #EF4444;
+    --purple: #8B5CF6;
+    --green: #10B981;
+    --teal: #14B8A6;
+  }
+  body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 2px; }
+  .status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: background 0.4s, color 0.4s, border-color 0.4s;
+    cursor: default;
+    position: relative;
+  }
+  .status-badge[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: #1E293B;
+    border: 1px solid #334155;
+    color: #F1F5F9;
+    font-size: 0.72rem;
+    font-weight: 400;
+    padding: 6px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .status-badge.green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #34D399; }
+  .status-badge.yellow { background: rgba(245,158,11,0.15);  border: 1px solid rgba(245,158,11,0.4);  color: #FCD34D; }
+  .status-badge.red    { background: rgba(239,68,68,0.15);   border: 1px solid rgba(239,68,68,0.4);   color: #F87171; }
+  .status-badge.blue   { background: rgba(59,130,246,0.15);  border: 1px solid rgba(59,130,246,0.4);  color: #93C5FD; }
+
+  /* MAIN LAYOUT */
+  .main { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
+
+  /* KPI CARDS */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--accent);
+  }
+  .kpi-icon { font-size: 1.2rem; margin-bottom: 5px; }
+  .kpi-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .kpi-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); margin: 3px 0 2px; line-height: 1; }
+  .kpi-sub { font-size: 0.65rem; color: var(--muted); }
+
+  /* CONTROLS */
+  .controls {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+  }
+  .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+  .ctrl-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+  .ctrl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .slider-container { position: relative; width: 220px; height: 24px; }
+  .slider-container input[type=range] {
+    position: absolute;
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    height: 4px;
+    background: transparent;
+    pointer-events: none;
+    top: 50%; transform: translateY(-50%);
+  }
+  .slider-container input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--blue);
+    pointer-events: all;
+    cursor: pointer;
+    border: 2px solid #fff;
+  }
+  .slider-track {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 100%; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .slider-fill {
+    position: absolute;
+    top: 0; height: 100%;
+    background: var(--blue);
+    border-radius: 2px;
+  }
+  .slider-time { font-size: 0.78rem; color: var(--text); font-weight: 500; min-width: 40px; text-align: center; }
+  .toggle-btn {
+    background: var(--border);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .cb-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cb-item { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .cb-item input[type=checkbox] { accent-color: var(--blue); width: 14px; height: 14px; cursor: pointer; }
+  .cb-item label { font-size: 0.78rem; color: var(--text); cursor: pointer; }
+  .cb-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* CHARTS */
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-title { font-size: 0.85rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 14px; }
+  .chart-wrap { position: relative; height: 300px; }
+  .chart-wrap-tall { position: relative; height: 250px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+  /* INSIGHTS */
+  .insights-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .insights-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+  .insight-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .insight-item:last-child { border-bottom: none; }
+
+  /* UPLOAD BANNER */
+  .upload-banner {
+    background: linear-gradient(135deg, #0F2744 0%, #1E293B 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .upload-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .upload-drop-zone {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1.5px dashed #334155;
+    border-radius: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 420px;
+  }
+  .upload-drop-zone:hover, .upload-drop-zone.dragover {
+    border-color: var(--blue);
+    background: rgba(59,130,246,0.08);
+  }
+  .upload-drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .upload-text { font-size: 0.82rem; color: var(--muted); }
+  .upload-text strong { color: var(--text); font-weight: 600; }
+  .upload-status {
+    font-size: 0.78rem;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .upload-status.idle { color: var(--muted); }
+  .upload-status.loading { color: #60A5FA; background: rgba(59,130,246,0.12); }
+  .upload-status.success { color: #34D399; background: rgba(16,185,129,0.12); }
+  .upload-status.error { color: #F87171; background: rgba(239,68,68,0.12); }
+  .upload-hint {
+    font-size: 0.72rem;
+    color: #475569;
+    flex-basis: 100%;
+    padding-left: 2px;
+  }
+  .col-map-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .col-map-row select {
+    background: #0F172A;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .col-map-section {
+    display: none;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 28px 14px;
+  }
+  .col-map-section.visible { display: block; }
+  .col-map-title { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; margin-bottom: 10px; }
+  .apply-btn {
+    background: var(--blue);
+    border: none;
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+  .apply-btn:hover { opacity: 0.85; }
+
+  @media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 700px) {
+    .two-col { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .header { padding: 14px 16px; }
+    .main { padding: 14px 12px; }
+    .slider-container { width: 160px; }
+    .upload-banner { padding: 12px 14px; }
+    .col-map-section { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>☀️ Solar Energy Monitor</h1>
+    <p id="headerSubtitle">4 May 2026 &nbsp;·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</p>
+  </div>
+  <div class="status-badge green" id="statusBadge">🟢 System Online</div>
+</div>
+
+<!-- UPLOAD BANNER -->
+<div class="upload-banner">
+  <span class="upload-label">📂 Load Data</span>
+  <div class="upload-drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this.files[0])">
+    <span class="upload-icon">⬆️</span>
+    <div class="upload-text"><strong>Upload new dataset</strong> — drag & drop or click to browse (.xlsx, .xls, .csv)</div>
+  </div>
+  <div class="upload-status idle" id="uploadStatus">Using built-in sample data</div>
+  <div class="upload-hint" id="uploadHint">Expected columns: Time, Production(kW), Consumption(kW), Grid(kW), Battery(kW), SOC(%), PV(kW) — or map custom columns after upload.</div>
+</div>
+
+<!-- COLUMN MAPPER (shown after upload if columns don't auto-detect) -->
+<div class="col-map-section" id="colMapSection">
+  <div class="col-map-title">🗂 Map your columns to dashboard fields</div>
+  <div class="col-map-row" id="colMapRow"></div>
+  <br>
+  <button class="apply-btn" onclick="applyColumnMap()">✅ Apply & Load Dashboard</button>
+</div>
+
+<div class="main">
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <div class="ctrl-group">
+      <div class="ctrl-label">Time Range</div>
+      <div class="ctrl-row">
+        <span class="slider-time" id="tStart">00:00</span>
+        <div class="slider-container" id="sliderWrap">
+          <div class="slider-track"><div class="slider-fill" id="sliderFill"></div></div>
+          <input type="range" id="rangeStart" min="0" max="288" value="0" step="1">
+          <input type="range" id="rangeEnd" min="0" max="288" value="288" step="1">
+        </div>
+        <span class="slider-time" id="tEnd">24:00</span>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Series</div>
+      <div class="cb-group" id="seriesToggle"></div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Chart Style</div>
+      <div class="ctrl-row">
+        <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')">Line</button>
+        <button class="toggle-btn" id="btnArea" onclick="setChartType('area')">Area</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Smoothing</div>
+      <div class="ctrl-row">
+        <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()">5-pt Rolling Avg</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Reset</div>
+      <div class="ctrl-row">
+        <button class="toggle-btn" onclick="resetFilters()">Reset All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN TIME-SERIES CHART -->
+  <div class="chart-card">
+    <div class="chart-title">⚡ Power Flow — Production, Consumption, Battery & Grid</div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+  </div>
+
+  <!-- SOC CHART -->
+  <div class="chart-card">
+    <div class="chart-title">🔋 Battery State of Charge (%)</div>
+    <div class="chart-wrap"><canvas id="socChart"></canvas></div>
+  </div>
+
+  <!-- TWO COLUMN -->
+  <div class="two-col">
+    <div class="chart-card" style="margin-bottom:0">
+      <div class="chart-title">🌐 Energy Source Breakdown</div>
+      <div class="chart-wrap-tall"><canvas id="donutChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:0">
+      <div class="chart-title">📊 Hourly Average — Production vs Consumption</div>
+      <div class="chart-wrap-tall"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="insights-card" style="margin-top:20px">
+    <div class="insights-title">📊 Key Insights</div>
+    <div id="insightsPanel"></div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// FILE UPLOAD & PARSING
+// ============================================================
+
+// Drag-and-drop support
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFileUpload(f);
+});
+
+let rawUploadedRows = null; // raw array of objects from parsed file
+let uploadedHeaders = [];
+
+// Known column aliases for auto-detection
+const FIELD_ALIASES = {
+  time:           ['time','datetime','date','timestamp','date time','date/time'],
+  production_kw:  ['production','production(kw)','production（kw）','prod','prod(kw)','production_kw','inverter output','output(kw)'],
+  consumption_kw: ['consumption','consumption(kw)','consumption（kw）','load','load(kw)','consumption_kw','home consumption'],
+  grid_kw:        ['grid','grid(kw)','grid（kw）','grid_kw','grid power','grid import'],
+  battery_kw:     ['battery','battery(kw)','battery（kw）','battery_kw','bat','bat(kw)','battery power'],
+  soc_pct:        ['soc','soc(%)','soc（%）','soc_pct','state of charge','battery soc','soc%','charge(%)'],
+  pv_kw:          ['pv','pv(kw)','pv（kw）','pv_kw','solar','solar(kw)','panel','panels','pv output'],
+};
+
+function normalise(s) {
+  return String(s).toLowerCase().replace(/[\s_\-]+/g, '').replace(/[（(）)]/g, '').trim();
+}
+
+function autoDetectColumns(headers) {
+  const map = {};
+  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
+    for (const h of headers) {
+      if (aliases.some(a => normalise(a) === normalise(h))) {
+        map[field] = h;
+        break;
+      }
+    }
+  }
+  return map;
+}
+
+function setUploadStatus(msg, cls) {
+  const el = document.getElementById('uploadStatus');
+  el.textContent = msg;
+  el.className = 'upload-status ' + cls;
+}
+
+function handleFileUpload(file) {
+  if (!file) return;
+  setUploadStatus('⏳ Reading file…', 'loading');
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      let rows;
+      if (ext === 'csv') {
+        rows = parseCSV(e.target.result);
+      } else {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const sheetName = wb.SheetNames[0];
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: 0, raw: false });
+      }
+
+      if (!rows || rows.length === 0) { setUploadStatus('❌ No data rows found', 'error'); return; }
+
+      rawUploadedRows = rows;
+      uploadedHeaders = Object.keys(rows[0]);
+      const autoMap = autoDetectColumns(uploadedHeaders);
+      const required = ['time','production_kw','consumption_kw','grid_kw','battery_kw','soc_pct','pv_kw'];
+      const allMapped = required.every(f => autoMap[f]);
+
+      if (allMapped) {
+        setUploadStatus(`✅ Loaded ${rows.length} rows from "${file.name}"`, 'success');
+        document.getElementById('uploadHint').textContent = `Auto-detected all columns from "${file.name}". Dashboard updated.`;
+        document.getElementById('colMapSection').classList.remove('visible');
+        loadDataFromMap(autoMap);
+      } else {
+        // Show manual column mapper
+        setUploadStatus(`⚠️ Map columns to continue`, 'loading');
+        document.getElementById('uploadHint').textContent = `Some columns couldn't be auto-detected from "${file.name}". Please map them below.`;
+        showColumnMapper(autoMap);
+      }
+    } catch(err) {
+      setUploadStatus('❌ Failed to parse file: ' + err.message, 'error');
+      console.error(err);
+    }
+  };
+  if (ext === 'csv') reader.readAsText(file);
+  else reader.readAsArrayBuffer(file);
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] ?? '');
+    return obj;
+  });
+}
+
+function showColumnMapper(autoMap) {
+  const FIELD_LABELS = {
+    time: '🕐 Time', production_kw: '⚡ Production (kW)', consumption_kw: '🏠 Consumption (kW)',
+    grid_kw: '🔌 Grid (kW)', battery_kw: '🔋 Battery (kW)', soc_pct: '📊 SOC (%)', pv_kw: '☀️ PV (kW)'
+  };
+  const fields = Object.keys(FIELD_LABELS);
+  const optionsList = ['— skip —', ...uploadedHeaders].map(h => `<option value="${h}">${h}</option>`).join('');
+
+  document.getElementById('colMapRow').innerHTML = fields.map(f => {
+    const selected = autoMap[f] || '';
+    const opts = ['— skip —', ...uploadedHeaders].map(h =>
+      `<option value="${h}" ${h === selected ? 'selected' : ''}>${h}</option>`
+    ).join('');
+    return `<label style="color:var(--muted)">${FIELD_LABELS[f]}</label>
+      <select id="cmap_${f}">${opts}</select>`;
+  }).join(' &nbsp; ');
+
+  document.getElementById('colMapSection').classList.add('visible');
+}
+
+function applyColumnMap() {
+  const fields = ['time','production_kw','consumption_kw','grid_kw','battery_kw','soc_pct','pv_kw'];
+  const map = {};
+  for (const f of fields) {
+    const val = document.getElementById(`cmap_${f}`).value;
+    if (val && val !== '— skip —') map[f] = val;
+  }
+  if (!map.time) { alert('Please map the Time column — it is required.'); return; }
+  document.getElementById('colMapSection').classList.remove('visible');
+  loadDataFromMap(map);
+  setUploadStatus(`✅ Loaded ${rawUploadedRows.length} rows with custom column mapping`, 'success');
+}
+
+function coerceNum(v) {
+  const n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function formatDateStr(v) {
+  if (!v) return '';
+  // Already an ISO/standard string
+  if (typeof v === 'string') {
+    // Try to normalise various date formats
+    const s = v.trim();
+    // If it has a T or space separator and looks like datetime, return as-is
+    if (/\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(s)) return s;
+    // Try parsing
+    const d = new Date(s);
+    if (!isNaN(d)) return d.toISOString().replace('T', ' ').slice(0, 19);
+    return s;
+  }
+  if (v instanceof Date) return v.toISOString().replace('T', ' ').slice(0, 19);
+  // Excel serial number
+  if (typeof v === 'number') {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return d.toISOString().replace('T', ' ').slice(0, 19);
+  }
+  return String(v);
+}
+
+function loadDataFromMap(map) {
+  const newData = rawUploadedRows.map(row => ({
+    time:           formatDateStr(row[map.time] ?? ''),
+    production_kw:  coerceNum(row[map.production_kw] ?? 0),
+    consumption_kw: coerceNum(row[map.consumption_kw] ?? 0),
+    grid_kw:        coerceNum(row[map.grid_kw] ?? 0),
+    battery_kw:     coerceNum(row[map.battery_kw] ?? 0),
+    soc_pct:        coerceNum(row[map.soc_pct] ?? 0),
+    pv_kw:          coerceNum(row[map.pv_kw] ?? 0),
+    generator_kw:   0,
+    grid_inverter_kw: 0,
+  })).filter(d => d.time);
+
+  // Replace global DATA
+  DATA.length = 0;
+  newData.forEach(d => DATA.push(d));
+
+  // Detect date from first row
+  const dateStr = DATA[0]?.time?.slice(0, 10) ?? '';
+  const prettyDate = dateStr ? (() => {
+    const d = new Date(dateStr + 'T12:00:00');
+    return isNaN(d) ? dateStr : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  })() : 'Uploaded Data';
+
+  document.getElementById('headerSubtitle').innerHTML =
+    `${prettyDate} &nbsp;·&nbsp; ${DATA.length} Readings`;
+
+  // Reset controls and rebuild everything
+  startIdx = 0;
+  endIdx = DATA.length - 1;
+  document.getElementById('rangeStart').max = DATA.length - 1;
+  document.getElementById('rangeEnd').max = DATA.length - 1;
+  document.getElementById('rangeStart').value = 0;
+  document.getElementById('rangeEnd').value = DATA.length - 1;
+  document.getElementById('tStart').textContent = idxToTime(0);
+  document.getElementById('tEnd').textContent = '24:00';
+  document.getElementById('sliderFill').style.left = '0%';
+  document.getElementById('sliderFill').style.width = '100%';
+
+  // Destroy and rebuild all charts
+  [mainChart, socChart, donutChart, barChart].forEach(c => { if (c) c.destroy(); });
+  mainChart = null; socChart = null; donutChart = null; barChart = null;
+
+  renderKPIs();
+  buildMainChart();
+  buildSOCChart();
+  buildDonutChart();
+  buildBarChart();
+  renderInsights();
+}
+
+// ============================================================
+// DATA
+// ============================================================
+const DATA = [{"time":"2026-05-04 00:00:00","production_kw":0.0,"consumption_kw":0.52,"grid_kw":0.02,"battery_kw":0.63,"soc_pct":59,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:05:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.0,"battery_kw":0.63,"soc_pct":58,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:10:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.0,"battery_kw":0.5,"soc_pct":58,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:15:00","production_kw":0.0,"consumption_kw":0.35,"grid_kw":0.0,"battery_kw":0.49,"soc_pct":58,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:20:00","production_kw":0.0,"consumption_kw":0.38,"grid_kw":0.02,"battery_kw":0.5,"soc_pct":58,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:25:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.02,"battery_kw":0.62,"soc_pct":57,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:30:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.0,"battery_kw":0.56,"soc_pct":57,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:35:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.02,"battery_kw":0.65,"soc_pct":57,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:40:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.02,"battery_kw":0.64,"soc_pct":56,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:45:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.02,"battery_kw":0.64,"soc_pct":56,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:50:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.0,"battery_kw":0.64,"soc_pct":56,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 00:55:00","production_kw":0.0,"consumption_kw":0.52,"grid_kw":0.0,"battery_kw":0.65,"soc_pct":55,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:00:00","production_kw":0.0,"consumption_kw":0.3,"grid_kw":0.02,"battery_kw":0.41,"soc_pct":55,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:05:00","production_kw":0.0,"consumption_kw":0.47,"grid_kw":0.02,"battery_kw":0.58,"soc_pct":55,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:10:00","production_kw":0.0,"consumption_kw":0.47,"grid_kw":0.02,"battery_kw":0.58,"soc_pct":54,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:15:00","production_kw":0.0,"consumption_kw":0.45,"grid_kw":0.0,"battery_kw":0.58,"soc_pct":54,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:20:00","production_kw":0.0,"consumption_kw":0.43,"grid_kw":0.0,"battery_kw":0.56,"soc_pct":54,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:25:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.0,"battery_kw":0.64,"soc_pct":54,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:30:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.0,"battery_kw":0.64,"soc_pct":53,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:35:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.0,"battery_kw":0.64,"soc_pct":53,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:40:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.0,"battery_kw":0.63,"soc_pct":53,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:45:00","production_kw":0.0,"consumption_kw":0.52,"grid_kw":0.02,"battery_kw":0.62,"soc_pct":52,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:50:00","production_kw":0.0,"consumption_kw":0.48,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":52,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 01:55:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.02,"battery_kw":0.61,"soc_pct":52,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:00:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.02,"battery_kw":0.61,"soc_pct":51,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:05:00","production_kw":0.0,"consumption_kw":0.48,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":51,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:10:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.02,"battery_kw":0.61,"soc_pct":51,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:15:00","production_kw":0.0,"consumption_kw":0.52,"grid_kw":0.02,"battery_kw":0.63,"soc_pct":50,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:20:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.02,"battery_kw":0.47,"soc_pct":50,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:25:00","production_kw":0.0,"consumption_kw":0.35,"grid_kw":0.02,"battery_kw":0.46,"soc_pct":50,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:30:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.02,"battery_kw":0.47,"soc_pct":50,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:35:00","production_kw":0.0,"consumption_kw":0.49,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":49,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:40:00","production_kw":0.0,"consumption_kw":0.51,"grid_kw":0.02,"battery_kw":0.62,"soc_pct":49,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:45:00","production_kw":0.0,"consumption_kw":0.58,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":49,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:50:00","production_kw":0.0,"consumption_kw":0.56,"grid_kw":0.0,"battery_kw":0.68,"soc_pct":48,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 02:55:00","production_kw":0.0,"consumption_kw":0.55,"grid_kw":0.0,"battery_kw":0.68,"soc_pct":48,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:00:00","production_kw":0.0,"consumption_kw":0.57,"grid_kw":0.02,"battery_kw":0.67,"soc_pct":48,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:05:00","production_kw":0.0,"consumption_kw":0.4,"grid_kw":0.0,"battery_kw":0.54,"soc_pct":47,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:10:00","production_kw":0.0,"consumption_kw":0.43,"grid_kw":0.02,"battery_kw":0.53,"soc_pct":47,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:15:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.02,"battery_kw":0.53,"soc_pct":47,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:20:00","production_kw":0.0,"consumption_kw":0.33,"grid_kw":0.0,"battery_kw":0.46,"soc_pct":47,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:25:00","production_kw":0.0,"consumption_kw":0.46,"grid_kw":0.0,"battery_kw":0.59,"soc_pct":46,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:30:00","production_kw":0.0,"consumption_kw":0.47,"grid_kw":0.0,"battery_kw":0.6,"soc_pct":46,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:35:00","production_kw":0.0,"consumption_kw":0.47,"grid_kw":0.0,"battery_kw":0.6,"soc_pct":46,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:40:00","production_kw":0.0,"consumption_kw":0.49,"grid_kw":0.02,"battery_kw":0.6,"soc_pct":45,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:45:00","production_kw":0.0,"consumption_kw":0.48,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":45,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:50:00","production_kw":0.0,"consumption_kw":0.35,"grid_kw":0.02,"battery_kw":0.46,"soc_pct":45,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 03:55:00","production_kw":0.0,"consumption_kw":0.33,"grid_kw":0.0,"battery_kw":0.46,"soc_pct":44,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:00:00","production_kw":0.0,"consumption_kw":0.35,"grid_kw":0.02,"battery_kw":0.46,"soc_pct":44,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:05:00","production_kw":0.0,"consumption_kw":0.34,"grid_kw":0.02,"battery_kw":0.45,"soc_pct":44,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:10:00","production_kw":0.0,"consumption_kw":0.35,"grid_kw":0.02,"battery_kw":0.46,"soc_pct":44,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:15:00","production_kw":0.0,"consumption_kw":0.46,"grid_kw":0.0,"battery_kw":0.59,"soc_pct":44,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:20:00","production_kw":0.0,"consumption_kw":0.49,"grid_kw":0.02,"battery_kw":0.6,"soc_pct":43,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:25:00","production_kw":0.0,"consumption_kw":0.46,"grid_kw":0.0,"battery_kw":0.59,"soc_pct":43,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:30:00","production_kw":0.0,"consumption_kw":0.47,"grid_kw":0.0,"battery_kw":0.6,"soc_pct":43,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:35:00","production_kw":0.0,"consumption_kw":0.48,"grid_kw":0.02,"battery_kw":0.59,"soc_pct":42,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:40:00","production_kw":0.0,"consumption_kw":0.33,"grid_kw":0.0,"battery_kw":0.46,"soc_pct":42,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:45:00","production_kw":0.0,"consumption_kw":0.75,"grid_kw":0.0,"battery_kw":0.87,"soc_pct":42,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:50:00","production_kw":0.0,"consumption_kw":0.28,"grid_kw":0.02,"battery_kw":0.39,"soc_pct":41,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 04:55:00","production_kw":0.0,"consumption_kw":0.26,"grid_kw":0.0,"battery_kw":0.4,"soc_pct":41,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:00:00","production_kw":0.0,"consumption_kw":0.25,"grid_kw":0.0,"battery_kw":0.38,"soc_pct":41,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:05:00","production_kw":0.0,"consumption_kw":0.27,"grid_kw":0.02,"battery_kw":0.39,"soc_pct":41,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:10:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.02,"battery_kw":0.52,"soc_pct":41,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:15:00","production_kw":0.0,"consumption_kw":0.39,"grid_kw":0.0,"battery_kw":0.52,"soc_pct":40,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:20:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.02,"battery_kw":0.53,"soc_pct":40,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:25:00","production_kw":0.0,"consumption_kw":0.39,"grid_kw":0.0,"battery_kw":0.52,"soc_pct":40,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:30:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.02,"battery_kw":0.52,"soc_pct":40,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:35:00","production_kw":0.0,"consumption_kw":0.27,"grid_kw":0.02,"battery_kw":0.38,"soc_pct":39,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:40:00","production_kw":0.0,"consumption_kw":0.28,"grid_kw":0.02,"battery_kw":0.39,"soc_pct":39,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:45:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.02,"battery_kw":0.47,"soc_pct":39,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:50:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.02,"battery_kw":0.47,"soc_pct":39,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 05:55:00","production_kw":0.0,"consumption_kw":0.33,"grid_kw":0.0,"battery_kw":0.46,"soc_pct":38,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:00:00","production_kw":0.0,"consumption_kw":0.43,"grid_kw":0.02,"battery_kw":0.54,"soc_pct":38,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:05:00","production_kw":0.01,"consumption_kw":0.55,"grid_kw":0.0,"battery_kw":0.68,"soc_pct":38,"pv_kw":0.01,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:10:00","production_kw":0.04,"consumption_kw":0.57,"grid_kw":0.02,"battery_kw":0.68,"soc_pct":38,"pv_kw":0.04,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:15:00","production_kw":0.06,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":37,"pv_kw":0.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:20:00","production_kw":0.06,"consumption_kw":0.55,"grid_kw":0.02,"battery_kw":0.66,"soc_pct":37,"pv_kw":0.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:25:00","production_kw":0.07,"consumption_kw":0.52,"grid_kw":0.0,"battery_kw":0.65,"soc_pct":37,"pv_kw":0.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:30:00","production_kw":0.06,"consumption_kw":0.4,"grid_kw":0.02,"battery_kw":0.5,"soc_pct":36,"pv_kw":0.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:35:00","production_kw":0.08,"consumption_kw":0.27,"grid_kw":0.0,"battery_kw":0.37,"soc_pct":36,"pv_kw":0.08,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:40:00","production_kw":0.1,"consumption_kw":0.28,"grid_kw":0.0,"battery_kw":0.38,"soc_pct":36,"pv_kw":0.1,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:45:00","production_kw":0.12,"consumption_kw":0.27,"grid_kw":0.0,"battery_kw":0.35,"soc_pct":36,"pv_kw":0.12,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:50:00","production_kw":0.14,"consumption_kw":0.29,"grid_kw":0.02,"battery_kw":0.33,"soc_pct":35,"pv_kw":0.14,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 06:55:00","production_kw":0.16,"consumption_kw":0.32,"grid_kw":0.02,"battery_kw":0.34,"soc_pct":35,"pv_kw":0.16,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:00:00","production_kw":0.19,"consumption_kw":0.34,"grid_kw":0.02,"battery_kw":0.34,"soc_pct":35,"pv_kw":0.19,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:05:00","production_kw":0.22,"consumption_kw":0.45,"grid_kw":0.0,"battery_kw":0.43,"soc_pct":35,"pv_kw":0.22,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:10:00","production_kw":0.23,"consumption_kw":0.46,"grid_kw":0.02,"battery_kw":0.41,"soc_pct":35,"pv_kw":0.23,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:15:00","production_kw":0.26,"consumption_kw":0.45,"grid_kw":0.0,"battery_kw":0.4,"soc_pct":35,"pv_kw":0.26,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:20:00","production_kw":0.27,"consumption_kw":0.46,"grid_kw":0.02,"battery_kw":0.38,"soc_pct":34,"pv_kw":0.27,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:25:00","production_kw":0.29,"consumption_kw":0.3,"grid_kw":0.02,"battery_kw":0.2,"soc_pct":34,"pv_kw":0.28,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:30:00","production_kw":0.32,"consumption_kw":0.32,"grid_kw":0.0,"battery_kw":0.22,"soc_pct":34,"pv_kw":0.32,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:35:00","production_kw":0.33,"consumption_kw":0.33,"grid_kw":0.02,"battery_kw":0.19,"soc_pct":34,"pv_kw":0.33,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:40:00","production_kw":0.34,"consumption_kw":0.47,"grid_kw":0.0,"battery_kw":0.33,"soc_pct":33,"pv_kw":0.34,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:45:00","production_kw":0.37,"consumption_kw":0.52,"grid_kw":0.37,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.37,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:50:00","production_kw":0.37,"consumption_kw":0.51,"grid_kw":0.34,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.37,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 07:55:00","production_kw":0.39,"consumption_kw":0.39,"grid_kw":0.21,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.39,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:00:00","production_kw":0.4,"consumption_kw":0.37,"grid_kw":0.18,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.4,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:05:00","production_kw":0.42,"consumption_kw":0.36,"grid_kw":0.16,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.42,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:10:00","production_kw":0.43,"consumption_kw":0.34,"grid_kw":0.11,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.43,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:15:00","production_kw":0.45,"consumption_kw":0.49,"grid_kw":0.25,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.45,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:20:00","production_kw":0.46,"consumption_kw":0.48,"grid_kw":0.24,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.45,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:25:00","production_kw":0.45,"consumption_kw":0.47,"grid_kw":0.23,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.44,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:30:00","production_kw":0.49,"consumption_kw":0.47,"grid_kw":0.19,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.49,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:35:00","production_kw":0.52,"consumption_kw":0.34,"grid_kw":0.03,"battery_kw":0.01,"soc_pct":33,"pv_kw":0.52,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:40:00","production_kw":0.73,"consumption_kw":0.34,"grid_kw":0.02,"battery_kw":-0.18,"soc_pct":33,"pv_kw":0.73,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:45:00","production_kw":1.2,"consumption_kw":0.3,"grid_kw":0.0,"battery_kw":-0.65,"soc_pct":33,"pv_kw":1.2,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:50:00","production_kw":1.54,"consumption_kw":0.24,"grid_kw":0.02,"battery_kw":-1.06,"soc_pct":34,"pv_kw":1.54,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 08:55:00","production_kw":1.73,"consumption_kw":0.23,"grid_kw":0.0,"battery_kw":-1.22,"soc_pct":34,"pv_kw":1.72,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:00:00","production_kw":1.81,"consumption_kw":4.07,"grid_kw":2.48,"battery_kw":0.01,"soc_pct":35,"pv_kw":1.81,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:05:00","production_kw":1.9,"consumption_kw":4.03,"grid_kw":2.34,"battery_kw":0.02,"soc_pct":35,"pv_kw":1.89,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:10:00","production_kw":1.95,"consumption_kw":4.02,"grid_kw":2.27,"battery_kw":0.02,"soc_pct":35,"pv_kw":1.95,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:15:00","production_kw":2.15,"consumption_kw":4.07,"grid_kw":2.13,"battery_kw":0.01,"soc_pct":35,"pv_kw":2.15,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:20:00","production_kw":2.69,"consumption_kw":3.96,"grid_kw":1.49,"battery_kw":0.01,"soc_pct":35,"pv_kw":2.69,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:25:00","production_kw":2.97,"consumption_kw":4.02,"grid_kw":1.28,"battery_kw":0.0,"soc_pct":35,"pv_kw":2.97,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:30:00","production_kw":3.15,"consumption_kw":4.04,"grid_kw":1.13,"battery_kw":0.01,"soc_pct":35,"pv_kw":3.15,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:35:00","production_kw":3.31,"consumption_kw":4.05,"grid_kw":0.98,"battery_kw":0.01,"soc_pct":35,"pv_kw":3.3,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:40:00","production_kw":3.4,"consumption_kw":4.06,"grid_kw":0.9,"battery_kw":0.01,"soc_pct":35,"pv_kw":3.4,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:45:00","production_kw":3.53,"consumption_kw":4.25,"grid_kw":0.97,"battery_kw":0.01,"soc_pct":35,"pv_kw":3.53,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:50:00","production_kw":3.59,"consumption_kw":4.19,"grid_kw":0.83,"battery_kw":0.02,"soc_pct":35,"pv_kw":3.59,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 09:55:00","production_kw":3.69,"consumption_kw":1.27,"grid_kw":0.0,"battery_kw":-2.14,"soc_pct":35,"pv_kw":3.68,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:00:00","production_kw":3.76,"consumption_kw":4.05,"grid_kw":0.0,"battery_kw":0.55,"soc_pct":35,"pv_kw":3.75,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:05:00","production_kw":3.83,"consumption_kw":4.06,"grid_kw":0.02,"battery_kw":0.47,"soc_pct":34,"pv_kw":3.82,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:10:00","production_kw":3.84,"consumption_kw":4.03,"grid_kw":0.0,"battery_kw":0.46,"soc_pct":34,"pv_kw":3.83,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:15:00","production_kw":3.89,"consumption_kw":4.05,"grid_kw":0.02,"battery_kw":0.4,"soc_pct":34,"pv_kw":3.89,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:20:00","production_kw":4.06,"consumption_kw":4.02,"grid_kw":0.0,"battery_kw":0.23,"soc_pct":34,"pv_kw":4.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:25:00","production_kw":3.02,"consumption_kw":4.16,"grid_kw":0.0,"battery_kw":1.4,"soc_pct":33,"pv_kw":3.02,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:30:00","production_kw":4.05,"consumption_kw":1.22,"grid_kw":0.0,"battery_kw":-2.55,"soc_pct":34,"pv_kw":4.05,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:35:00","production_kw":4.08,"consumption_kw":1.59,"grid_kw":0.13,"battery_kw":-2.36,"soc_pct":35,"pv_kw":4.08,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:40:00","production_kw":4.11,"consumption_kw":1.27,"grid_kw":-0.09,"battery_kw":-2.46,"soc_pct":37,"pv_kw":4.11,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:45:00","production_kw":4.34,"consumption_kw":1.44,"grid_kw":0.0,"battery_kw":-2.6,"soc_pct":38,"pv_kw":4.33,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:50:00","production_kw":4.43,"consumption_kw":1.33,"grid_kw":0.08,"battery_kw":-2.89,"soc_pct":39,"pv_kw":4.43,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 10:55:00","production_kw":3.24,"consumption_kw":1.13,"grid_kw":0.02,"battery_kw":-1.87,"soc_pct":41,"pv_kw":3.24,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:00:00","production_kw":4.59,"consumption_kw":1.23,"grid_kw":0.02,"battery_kw":-3.1,"soc_pct":42,"pv_kw":4.59,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:05:00","production_kw":4.73,"consumption_kw":1.21,"grid_kw":0.0,"battery_kw":-3.22,"soc_pct":44,"pv_kw":4.73,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:10:00","production_kw":4.63,"consumption_kw":1.22,"grid_kw":0.0,"battery_kw":-3.1,"soc_pct":45,"pv_kw":4.63,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:15:00","production_kw":4.61,"consumption_kw":1.3,"grid_kw":0.02,"battery_kw":-3.06,"soc_pct":47,"pv_kw":4.61,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:20:00","production_kw":4.54,"consumption_kw":1.23,"grid_kw":0.0,"battery_kw":-3.02,"soc_pct":48,"pv_kw":4.54,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:25:00","production_kw":4.62,"consumption_kw":1.13,"grid_kw":0.02,"battery_kw":-3.22,"soc_pct":50,"pv_kw":4.62,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:30:00","production_kw":4.81,"consumption_kw":1.28,"grid_kw":0.0,"battery_kw":-3.24,"soc_pct":52,"pv_kw":4.81,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:35:00","production_kw":1.07,"consumption_kw":1.15,"grid_kw":0.02,"battery_kw":0.27,"soc_pct":53,"pv_kw":1.07,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:40:00","production_kw":0.95,"consumption_kw":1.16,"grid_kw":0.02,"battery_kw":0.41,"soc_pct":53,"pv_kw":0.95,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:45:00","production_kw":4.94,"consumption_kw":1.12,"grid_kw":0.0,"battery_kw":-3.52,"soc_pct":55,"pv_kw":4.94,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:50:00","production_kw":5.02,"consumption_kw":1.13,"grid_kw":0.0,"battery_kw":-3.59,"soc_pct":56,"pv_kw":5.02,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 11:55:00","production_kw":4.86,"consumption_kw":1.27,"grid_kw":0.02,"battery_kw":-3.32,"soc_pct":58,"pv_kw":4.86,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:00:00","production_kw":1.13,"consumption_kw":1.28,"grid_kw":0.02,"battery_kw":0.36,"soc_pct":60,"pv_kw":1.13,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:05:00","production_kw":5.0,"consumption_kw":1.23,"grid_kw":0.0,"battery_kw":-3.46,"soc_pct":61,"pv_kw":4.99,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:10:00","production_kw":4.97,"consumption_kw":1.11,"grid_kw":0.02,"battery_kw":-3.57,"soc_pct":63,"pv_kw":4.97,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:15:00","production_kw":5.14,"consumption_kw":2.84,"grid_kw":0.1,"battery_kw":-2.13,"soc_pct":64,"pv_kw":5.14,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:20:00","production_kw":1.07,"consumption_kw":1.23,"grid_kw":0.0,"battery_kw":0.39,"soc_pct":65,"pv_kw":1.07,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:25:00","production_kw":1.06,"consumption_kw":2.17,"grid_kw":0.02,"battery_kw":1.32,"soc_pct":65,"pv_kw":1.05,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:30:00","production_kw":5.38,"consumption_kw":2.12,"grid_kw":0.02,"battery_kw":-2.99,"soc_pct":66,"pv_kw":5.38,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:35:00","production_kw":1.49,"consumption_kw":2.04,"grid_kw":0.0,"battery_kw":0.79,"soc_pct":66,"pv_kw":1.48,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:40:00","production_kw":4.94,"consumption_kw":1.29,"grid_kw":0.0,"battery_kw":-3.37,"soc_pct":68,"pv_kw":4.94,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:45:00","production_kw":4.86,"consumption_kw":1.34,"grid_kw":0.0,"battery_kw":-3.23,"soc_pct":70,"pv_kw":4.85,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:50:00","production_kw":1.06,"consumption_kw":1.27,"grid_kw":0.0,"battery_kw":0.41,"soc_pct":70,"pv_kw":1.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 12:55:00","production_kw":4.83,"consumption_kw":1.15,"grid_kw":0.02,"battery_kw":-3.42,"soc_pct":70,"pv_kw":4.83,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:00:00","production_kw":5.07,"consumption_kw":1.13,"grid_kw":0.0,"battery_kw":-3.63,"soc_pct":72,"pv_kw":5.07,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:05:00","production_kw":1.74,"consumption_kw":3.16,"grid_kw":0.0,"battery_kw":1.67,"soc_pct":72,"pv_kw":1.73,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:10:00","production_kw":2.29,"consumption_kw":1.32,"grid_kw":0.02,"battery_kw":-0.77,"soc_pct":72,"pv_kw":2.29,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:15:00","production_kw":5.05,"consumption_kw":1.25,"grid_kw":0.0,"battery_kw":-3.51,"soc_pct":73,"pv_kw":5.05,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:20:00","production_kw":4.31,"consumption_kw":1.17,"grid_kw":0.0,"battery_kw":-2.86,"soc_pct":75,"pv_kw":4.31,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:25:00","production_kw":4.78,"consumption_kw":1.2,"grid_kw":0.02,"battery_kw":-3.32,"soc_pct":76,"pv_kw":4.78,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:30:00","production_kw":4.47,"consumption_kw":1.22,"grid_kw":0.0,"battery_kw":-2.96,"soc_pct":78,"pv_kw":4.47,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:35:00","production_kw":4.45,"consumption_kw":1.25,"grid_kw":0.02,"battery_kw":-2.95,"soc_pct":79,"pv_kw":4.45,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:40:00","production_kw":4.35,"consumption_kw":1.22,"grid_kw":0.0,"battery_kw":-2.84,"soc_pct":81,"pv_kw":4.35,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:45:00","production_kw":4.35,"consumption_kw":1.11,"grid_kw":0.0,"battery_kw":-2.96,"soc_pct":82,"pv_kw":4.35,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:50:00","production_kw":4.21,"consumption_kw":1.12,"grid_kw":0.0,"battery_kw":-2.82,"soc_pct":84,"pv_kw":4.21,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 13:55:00","production_kw":1.36,"consumption_kw":1.54,"grid_kw":0.02,"battery_kw":0.37,"soc_pct":84,"pv_kw":1.36,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:00:00","production_kw":1.51,"consumption_kw":0.34,"grid_kw":0.02,"battery_kw":-0.95,"soc_pct":85,"pv_kw":1.51,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:05:00","production_kw":4.26,"consumption_kw":0.45,"grid_kw":0.02,"battery_kw":-3.53,"soc_pct":86,"pv_kw":4.26,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:10:00","production_kw":4.17,"consumption_kw":0.45,"grid_kw":0.02,"battery_kw":-3.44,"soc_pct":88,"pv_kw":4.17,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:15:00","production_kw":4.04,"consumption_kw":0.43,"grid_kw":0.0,"battery_kw":-3.33,"soc_pct":90,"pv_kw":4.04,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:20:00","production_kw":3.69,"consumption_kw":1.31,"grid_kw":0.0,"battery_kw":-2.11,"soc_pct":91,"pv_kw":3.69,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:25:00","production_kw":3.61,"consumption_kw":0.43,"grid_kw":0.0,"battery_kw":-2.89,"soc_pct":92,"pv_kw":3.61,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:30:00","production_kw":3.55,"consumption_kw":0.45,"grid_kw":0.02,"battery_kw":-2.86,"soc_pct":94,"pv_kw":3.55,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:35:00","production_kw":3.5,"consumption_kw":0.3,"grid_kw":0.0,"battery_kw":-2.91,"soc_pct":95,"pv_kw":3.5,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:40:00","production_kw":0.75,"consumption_kw":0.26,"grid_kw":0.0,"battery_kw":-0.26,"soc_pct":97,"pv_kw":0.75,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:45:00","production_kw":3.26,"consumption_kw":0.28,"grid_kw":0.02,"battery_kw":-2.74,"soc_pct":98,"pv_kw":3.26,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:50:00","production_kw":3.17,"consumption_kw":0.19,"grid_kw":0.0,"battery_kw":-2.72,"soc_pct":99,"pv_kw":3.17,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 14:55:00","production_kw":0.39,"consumption_kw":0.21,"grid_kw":0.03,"battery_kw":0.02,"soc_pct":100,"pv_kw":0.39,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:00:00","production_kw":0.66,"consumption_kw":0.19,"grid_kw":0.0,"battery_kw":-0.25,"soc_pct":100,"pv_kw":0.66,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:05:00","production_kw":2.56,"consumption_kw":2.23,"grid_kw":0.0,"battery_kw":-0.1,"soc_pct":100,"pv_kw":2.56,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:10:00","production_kw":2.59,"consumption_kw":2.23,"grid_kw":0.02,"battery_kw":-0.14,"soc_pct":100,"pv_kw":2.59,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:15:00","production_kw":2.3,"consumption_kw":2.21,"grid_kw":0.0,"battery_kw":0.12,"soc_pct":100,"pv_kw":2.3,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:20:00","production_kw":0.69,"consumption_kw":0.42,"grid_kw":0.03,"battery_kw":-0.07,"soc_pct":100,"pv_kw":0.68,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:25:00","production_kw":1.24,"consumption_kw":2.29,"grid_kw":0.0,"battery_kw":1.27,"soc_pct":100,"pv_kw":1.23,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:30:00","production_kw":0.69,"consumption_kw":1.41,"grid_kw":-0.27,"battery_kw":1.21,"soc_pct":99,"pv_kw":0.69,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:35:00","production_kw":0.91,"consumption_kw":2.29,"grid_kw":0.0,"battery_kw":1.61,"soc_pct":99,"pv_kw":0.91,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:40:00","production_kw":1.79,"consumption_kw":2.37,"grid_kw":0.02,"battery_kw":0.8,"soc_pct":99,"pv_kw":1.79,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:45:00","production_kw":1.61,"consumption_kw":0.35,"grid_kw":0.0,"battery_kw":-1.0,"soc_pct":99,"pv_kw":1.6,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:50:00","production_kw":1.7,"consumption_kw":0.56,"grid_kw":-0.02,"battery_kw":-0.86,"soc_pct":99,"pv_kw":1.7,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 15:55:00","production_kw":1.57,"consumption_kw":0.54,"grid_kw":0.02,"battery_kw":-0.8,"soc_pct":99,"pv_kw":1.57,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:00:00","production_kw":1.62,"consumption_kw":0.6,"grid_kw":0.02,"battery_kw":-0.79,"soc_pct":99,"pv_kw":1.62,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:05:00","production_kw":1.54,"consumption_kw":0.63,"grid_kw":0.0,"battery_kw":-0.66,"soc_pct":99,"pv_kw":1.53,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:10:00","production_kw":1.37,"consumption_kw":0.6,"grid_kw":0.02,"battery_kw":-0.55,"soc_pct":99,"pv_kw":1.37,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:15:00","production_kw":0.9,"consumption_kw":0.56,"grid_kw":0.0,"battery_kw":-0.1,"soc_pct":100,"pv_kw":0.9,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:20:00","production_kw":0.39,"consumption_kw":0.48,"grid_kw":0.02,"battery_kw":0.28,"soc_pct":100,"pv_kw":0.39,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:25:00","production_kw":0.38,"consumption_kw":0.47,"grid_kw":0.02,"battery_kw":0.28,"soc_pct":100,"pv_kw":0.38,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:30:00","production_kw":0.8,"consumption_kw":0.47,"grid_kw":0.0,"battery_kw":-0.1,"soc_pct":100,"pv_kw":0.8,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:35:00","production_kw":0.8,"consumption_kw":0.46,"grid_kw":0.0,"battery_kw":-0.1,"soc_pct":100,"pv_kw":0.8,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:40:00","production_kw":0.8,"consumption_kw":0.46,"grid_kw":0.0,"battery_kw":-0.11,"soc_pct":100,"pv_kw":0.8,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:45:00","production_kw":0.8,"consumption_kw":0.53,"grid_kw":0.02,"battery_kw":-0.06,"soc_pct":100,"pv_kw":0.8,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:50:00","production_kw":0.66,"consumption_kw":0.52,"grid_kw":0.02,"battery_kw":0.05,"soc_pct":100,"pv_kw":0.66,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 16:55:00","production_kw":0.33,"consumption_kw":0.47,"grid_kw":0.02,"battery_kw":0.34,"soc_pct":100,"pv_kw":0.33,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:00:00","production_kw":0.28,"consumption_kw":0.45,"grid_kw":0.0,"battery_kw":0.39,"soc_pct":100,"pv_kw":0.27,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:05:00","production_kw":0.23,"consumption_kw":0.33,"grid_kw":0.02,"battery_kw":0.28,"soc_pct":100,"pv_kw":0.23,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:10:00","production_kw":0.18,"consumption_kw":0.31,"grid_kw":0.0,"battery_kw":0.31,"soc_pct":100,"pv_kw":0.18,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:15:00","production_kw":0.15,"consumption_kw":0.31,"grid_kw":0.0,"battery_kw":0.35,"soc_pct":100,"pv_kw":0.15,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:20:00","production_kw":0.12,"consumption_kw":0.33,"grid_kw":0.0,"battery_kw":0.39,"soc_pct":99,"pv_kw":0.12,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:25:00","production_kw":0.06,"consumption_kw":0.38,"grid_kw":0.02,"battery_kw":0.46,"soc_pct":99,"pv_kw":0.06,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:30:00","production_kw":0.04,"consumption_kw":0.5,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":99,"pv_kw":0.04,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:35:00","production_kw":0.03,"consumption_kw":0.68,"grid_kw":0.02,"battery_kw":0.77,"soc_pct":99,"pv_kw":0.03,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:40:00","production_kw":0.03,"consumption_kw":0.6,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":98,"pv_kw":0.03,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:45:00","production_kw":0.04,"consumption_kw":0.58,"grid_kw":0.0,"battery_kw":0.7,"soc_pct":98,"pv_kw":0.04,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:50:00","production_kw":0.05,"consumption_kw":0.59,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":97,"pv_kw":0.05,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 17:55:00","production_kw":0.02,"consumption_kw":0.59,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":97,"pv_kw":0.02,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:00:00","production_kw":0.01,"consumption_kw":0.45,"grid_kw":0.02,"battery_kw":0.56,"soc_pct":97,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:05:00","production_kw":0.0,"consumption_kw":0.49,"grid_kw":0.0,"battery_kw":0.61,"soc_pct":96,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:10:00","production_kw":0.0,"consumption_kw":0.57,"grid_kw":0.0,"battery_kw":0.69,"soc_pct":96,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:15:00","production_kw":0.0,"consumption_kw":0.6,"grid_kw":0.0,"battery_kw":0.72,"soc_pct":96,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:20:00","production_kw":0.0,"consumption_kw":0.45,"grid_kw":0.0,"battery_kw":0.57,"soc_pct":95,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:25:00","production_kw":0.0,"consumption_kw":0.48,"grid_kw":0.02,"battery_kw":0.58,"soc_pct":95,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:30:00","production_kw":0.0,"consumption_kw":0.63,"grid_kw":0.02,"battery_kw":0.72,"soc_pct":95,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:35:00","production_kw":0.0,"consumption_kw":0.61,"grid_kw":0.0,"battery_kw":0.74,"soc_pct":94,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:40:00","production_kw":0.0,"consumption_kw":0.6,"grid_kw":0.0,"battery_kw":0.72,"soc_pct":94,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:45:00","production_kw":0.0,"consumption_kw":0.59,"grid_kw":0.0,"battery_kw":0.72,"soc_pct":94,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:50:00","production_kw":0.0,"consumption_kw":0.69,"grid_kw":0.0,"battery_kw":0.81,"soc_pct":93,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 18:55:00","production_kw":0.0,"consumption_kw":0.7,"grid_kw":0.02,"battery_kw":0.8,"soc_pct":93,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:00:00","production_kw":0.0,"consumption_kw":2.98,"grid_kw":0.0,"battery_kw":3.16,"soc_pct":92,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:05:00","production_kw":0.0,"consumption_kw":3.03,"grid_kw":0.02,"battery_kw":3.19,"soc_pct":91,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:10:00","production_kw":0.0,"consumption_kw":2.38,"grid_kw":0.02,"battery_kw":2.53,"soc_pct":90,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:15:00","production_kw":0.0,"consumption_kw":0.72,"grid_kw":0.0,"battery_kw":0.84,"soc_pct":89,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:20:00","production_kw":0.0,"consumption_kw":0.71,"grid_kw":0.0,"battery_kw":0.83,"soc_pct":88,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:25:00","production_kw":0.0,"consumption_kw":0.73,"grid_kw":0.02,"battery_kw":0.83,"soc_pct":88,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:30:00","production_kw":0.0,"consumption_kw":0.65,"grid_kw":0.02,"battery_kw":0.75,"soc_pct":88,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:35:00","production_kw":0.0,"consumption_kw":0.59,"grid_kw":0.0,"battery_kw":0.71,"soc_pct":87,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:40:00","production_kw":0.0,"consumption_kw":0.67,"grid_kw":0.0,"battery_kw":0.8,"soc_pct":87,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:45:00","production_kw":0.0,"consumption_kw":0.58,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":86,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:50:00","production_kw":0.0,"consumption_kw":0.55,"grid_kw":0.02,"battery_kw":0.65,"soc_pct":86,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 19:55:00","production_kw":0.0,"consumption_kw":0.53,"grid_kw":0.0,"battery_kw":0.65,"soc_pct":86,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:00:00","production_kw":0.0,"consumption_kw":0.55,"grid_kw":0.02,"battery_kw":0.66,"soc_pct":85,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:05:00","production_kw":0.0,"consumption_kw":0.58,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":85,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:10:00","production_kw":0.0,"consumption_kw":0.53,"grid_kw":0.0,"battery_kw":0.65,"soc_pct":85,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:15:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.02,"battery_kw":0.52,"soc_pct":84,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:20:00","production_kw":0.0,"consumption_kw":0.4,"grid_kw":0.0,"battery_kw":0.53,"soc_pct":84,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:25:00","production_kw":0.0,"consumption_kw":0.43,"grid_kw":0.02,"battery_kw":0.54,"soc_pct":84,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:30:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.0,"battery_kw":0.54,"soc_pct":84,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:35:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.67,"soc_pct":83,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:40:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":83,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:45:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.67,"soc_pct":83,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:50:00","production_kw":0.0,"consumption_kw":0.53,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":82,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 20:55:00","production_kw":0.0,"consumption_kw":0.53,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":82,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:00:00","production_kw":0.0,"consumption_kw":0.55,"grid_kw":0.02,"battery_kw":0.66,"soc_pct":82,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:05:00","production_kw":0.0,"consumption_kw":0.44,"grid_kw":0.02,"battery_kw":0.54,"soc_pct":81,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:10:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.0,"battery_kw":0.53,"soc_pct":81,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:15:00","production_kw":0.0,"consumption_kw":0.4,"grid_kw":0.0,"battery_kw":0.53,"soc_pct":81,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:20:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.02,"battery_kw":0.53,"soc_pct":80,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:25:00","production_kw":0.0,"consumption_kw":0.4,"grid_kw":0.0,"battery_kw":0.53,"soc_pct":80,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:30:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":80,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:35:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.0,"battery_kw":0.66,"soc_pct":79,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:40:00","production_kw":0.0,"consumption_kw":0.56,"grid_kw":0.02,"battery_kw":0.67,"soc_pct":79,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:45:00","production_kw":0.0,"consumption_kw":0.59,"grid_kw":0.02,"battery_kw":0.7,"soc_pct":78,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:50:00","production_kw":0.0,"consumption_kw":0.57,"grid_kw":0.0,"battery_kw":0.7,"soc_pct":78,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 21:55:00","production_kw":0.0,"consumption_kw":0.66,"grid_kw":0.0,"battery_kw":0.78,"soc_pct":78,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:00:00","production_kw":0.0,"consumption_kw":0.54,"grid_kw":0.02,"battery_kw":0.65,"soc_pct":77,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:05:00","production_kw":0.0,"consumption_kw":0.52,"grid_kw":0.0,"battery_kw":0.64,"soc_pct":77,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:10:00","production_kw":0.0,"consumption_kw":0.53,"grid_kw":0.02,"battery_kw":0.64,"soc_pct":77,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:15:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.0,"battery_kw":0.63,"soc_pct":76,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:20:00","production_kw":0.0,"consumption_kw":0.5,"grid_kw":0.0,"battery_kw":0.63,"soc_pct":76,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:25:00","production_kw":0.0,"consumption_kw":0.64,"grid_kw":0.0,"battery_kw":0.77,"soc_pct":76,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:30:00","production_kw":0.0,"consumption_kw":0.59,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":75,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:35:00","production_kw":0.0,"consumption_kw":0.58,"grid_kw":0.02,"battery_kw":0.69,"soc_pct":75,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:40:00","production_kw":0.0,"consumption_kw":0.57,"grid_kw":0.0,"battery_kw":0.69,"soc_pct":75,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:45:00","production_kw":0.0,"consumption_kw":0.55,"grid_kw":0.0,"battery_kw":0.68,"soc_pct":74,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:50:00","production_kw":0.0,"consumption_kw":0.56,"grid_kw":0.0,"battery_kw":0.69,"soc_pct":74,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 22:55:00","production_kw":0.0,"consumption_kw":0.37,"grid_kw":0.02,"battery_kw":0.49,"soc_pct":74,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:00:00","production_kw":0.0,"consumption_kw":0.36,"grid_kw":0.0,"battery_kw":0.48,"soc_pct":73,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:05:00","production_kw":0.0,"consumption_kw":0.39,"grid_kw":0.02,"battery_kw":0.5,"soc_pct":73,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:10:00","production_kw":0.0,"consumption_kw":0.3,"grid_kw":0.0,"battery_kw":0.43,"soc_pct":73,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:15:00","production_kw":0.0,"consumption_kw":0.32,"grid_kw":0.02,"battery_kw":0.43,"soc_pct":73,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:20:00","production_kw":0.0,"consumption_kw":0.46,"grid_kw":0.02,"battery_kw":0.57,"soc_pct":72,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:25:00","production_kw":0.0,"consumption_kw":0.41,"grid_kw":0.0,"battery_kw":0.54,"soc_pct":72,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:30:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.0,"battery_kw":0.55,"soc_pct":72,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:35:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.0,"battery_kw":0.55,"soc_pct":71,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:40:00","production_kw":0.0,"consumption_kw":0.44,"grid_kw":0.02,"battery_kw":0.54,"soc_pct":71,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:45:00","production_kw":0.0,"consumption_kw":0.42,"grid_kw":0.02,"battery_kw":0.53,"soc_pct":71,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:50:00","production_kw":0.0,"consumption_kw":0.38,"grid_kw":0.02,"battery_kw":0.49,"soc_pct":71,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-04 23:55:00","production_kw":0.0,"consumption_kw":0.37,"grid_kw":0.02,"battery_kw":0.48,"soc_pct":70,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0},{"time":"2026-05-05 00:00:00","production_kw":0.0,"consumption_kw":0.37,"grid_kw":0.02,"battery_kw":0.48,"soc_pct":70,"pv_kw":0.0,"generator_kw":0,"grid_inverter_kw":0}];
+
+// ============================================================
+// STATE
+// ============================================================
+let startIdx = 0, endIdx = DATA.length - 1;
+let smoothing = false;
+let chartType = 'line';
+let seriesVisible = { Production: true, Consumption: true, Grid: true, Battery: true, PV: true };
+let mainChart, socChart, donutChart, barChart;
+
+// ============================================================
+// HELPERS
+// ============================================================
+function fmtTime(t) {
+  const d = new Date(t.replace(' ', 'T'));
+  return d.toTimeString().slice(0, 5);
+}
+function idxToTime(idx) {
+  if (idx >= DATA.length) return '24:00';
+  return fmtTime(DATA[idx].time);
+}
+function rolling(arr, w) {
+  return arr.map((_, i) => {
+    const s = Math.max(0, i - Math.floor(w / 2));
+    const e = Math.min(arr.length, s + w);
+    const sl = arr.slice(s, e).filter(v => v !== null && v !== undefined);
+    return sl.length ? sl.reduce((a, b) => a + b, 0) / sl.length : 0;
+  });
+}
+function filteredData() {
+  return DATA.slice(startIdx, endIdx + 1);
+}
+function applySmooth(arr) {
+  return smoothing ? rolling(arr, 5) : arr;
+}
+function darkChartDefaults() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 200 },
+    plugins: {
+      legend: { labels: { color: '#94A3B8', font: { size: 11 }, boxWidth: 12, padding: 12 } },
+      tooltip: { backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 1, titleColor: '#F1F5F9', bodyColor: '#94A3B8' }
+    },
+    scales: {
+      x: { grid: { color: '#334155' }, ticks: { color: '#94A3B8', maxTicksLimit: 13, font: { size: 10 } } },
+      y: { grid: { color: '#334155' }, ticks: { color: '#94A3B8', font: { size: 10 } } }
+    }
+  };
+}
+
+// ============================================================
+// STATUS BADGE
+// ============================================================
+function updateStatusBadge() {
+  const last = DATA[DATA.length - 1];
+  const currentSOC = last.soc_pct;
+  const totalGrid = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw) * (5/60), 0);
+  const totalCons = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
+  const gridPct = totalGrid / totalCons * 100;
+
+  // Check conditions in priority order
+  const badge = document.getElementById('statusBadge');
+
+  if (currentSOC <= 15) {
+    badge.className = 'status-badge red';
+    badge.textContent = '🔴 Battery Critical';
+    badge.title = `SOC is at ${currentSOC}% — battery critically low`;
+  } else if (currentSOC <= 25) {
+    badge.className = 'status-badge yellow';
+    badge.textContent = '🟡 Battery Low';
+    badge.title = `SOC is at ${currentSOC}% — consider reducing consumption`;
+  } else if (gridPct > 25) {
+    badge.className = 'status-badge red';
+    badge.textContent = '🔴 High Grid Draw';
+    badge.title = `${gridPct.toFixed(1)}% of energy came from the grid today`;
+  } else if (gridPct > 10) {
+    badge.className = 'status-badge yellow';
+    badge.textContent = '🟡 Some Grid Usage';
+    badge.title = `${gridPct.toFixed(1)}% of energy came from the grid today`;
+  } else if (currentSOC >= 95) {
+    badge.className = 'status-badge blue';
+    badge.textContent = '🔵 Battery Full';
+    badge.title = `SOC is at ${currentSOC}% — battery fully charged`;
+  } else {
+    badge.className = 'status-badge green';
+    badge.textContent = '🟢 System Optimal';
+    badge.title = `SOC ${currentSOC}% · Grid draw ${gridPct.toFixed(1)}% — all systems healthy`;
+  }
+}
+
+
+function computeKPIs() {
+  const peakPV = Math.max(...DATA.map(d => d.pv_kw));
+  const totalPV = DATA.reduce((s, d) => s + d.pv_kw * (5/60), 0);
+  const totalCons = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
+  const totalGrid = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw) * (5/60), 0);
+  const currentSOC = DATA[DATA.length - 1].soc_pct;
+  const minSOC = Math.min(...DATA.map(d => d.soc_pct));
+  const maxSOC = Math.max(...DATA.map(d => d.soc_pct));
+  const gridIndep = (1 - totalGrid / totalCons) * 100;
+  return { peakPV, totalPV, totalCons, totalGrid, currentSOC, minSOC, maxSOC, gridIndep };
+}
+
+function renderKPIs() {
+  const k = computeKPIs();
+  const cards = [
+    { icon: '⚡', label: 'Peak PV Output', value: k.peakPV.toFixed(2), unit: 'kW', sub: 'max across all readings', accent: '#F59E0B' },
+    { icon: '☀️', label: 'Total PV Energy', value: k.totalPV.toFixed(1), unit: 'kWh', sub: 'solar harvest today', accent: '#F97316' },
+    { icon: '🏠', label: 'Total Consumption', value: k.totalCons.toFixed(1), unit: 'kWh', sub: 'home energy used', accent: '#3B82F6' },
+    { icon: '🔋', label: 'Battery SOC', value: k.currentSOC, unit: '%', sub: 'current state of charge', accent: '#10B981' },
+    { icon: '📊', label: 'SOC Range', value: `${k.minSOC}–${k.maxSOC}`, unit: '%', sub: 'min → max today', accent: '#8B5CF6' },
+    { icon: '🔌', label: 'Total Grid Input', value: k.totalGrid.toFixed(2), unit: 'kWh', sub: 'imported from grid today', accent: '#EF4444' },
+    { icon: '🌐', label: 'Grid Independence', value: k.gridIndep.toFixed(1), unit: '%', sub: 'of energy from solar+battery', accent: '#14B8A6' },
+  ];
+  document.getElementById('kpiGrid').innerHTML = cards.map(c => `
+    <div class="kpi-card" style="--accent:${c.accent}">
+      <div class="kpi-icon">${c.icon}</div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}<span style="font-size:0.9rem;margin-left:2px;font-weight:500">${c.unit}</span></div>
+      <div class="kpi-sub">${c.sub}</div>
+    </div>`).join('');
+  updateStatusBadge();
+}
+
+// ============================================================
+// SERIES CONTROLS
+// ============================================================
+const SERIES_CONF = [
+  { key: 'Production', color: '#F59E0B', field: 'production_kw' },
+  { key: 'Consumption', color: '#3B82F6', field: 'consumption_kw' },
+  { key: 'Grid', color: '#EF4444', field: 'grid_kw' },
+  { key: 'Battery', color: '#8B5CF6', field: 'battery_kw' },
+  { key: 'PV', color: '#F97316', field: 'pv_kw' },
+];
+
+function renderSeriesToggle() {
+  document.getElementById('seriesToggle').innerHTML = SERIES_CONF.map(s => `
+    <div class="cb-item">
+      <input type="checkbox" id="cb_${s.key}" checked onchange="toggleSeries('${s.key}')">
+      <div class="cb-dot" style="background:${s.color}"></div>
+      <label for="cb_${s.key}">${s.key}</label>
+    </div>`).join('');
+}
+
+function toggleSeries(key) {
+  seriesVisible[key] = document.getElementById(`cb_${key}`).checked;
+  updateMainChart();
+}
+
+// ============================================================
+// SLIDER
+// ============================================================
+function initSlider() {
+  const rs = document.getElementById('rangeStart');
+  const re = document.getElementById('rangeEnd');
+  function update() {
+    let s = parseInt(rs.value), e = parseInt(re.value);
+    if (s > e) { if (this === rs) rs.value = e; else re.value = s; s = parseInt(rs.value); e = parseInt(re.value); }
+    startIdx = s; endIdx = e;
+    document.getElementById('tStart').textContent = idxToTime(s);
+    document.getElementById('tEnd').textContent = e >= DATA.length - 1 ? '24:00' : idxToTime(e);
+    const pct1 = s / 288 * 100, pct2 = e / 288 * 100;
+    const fill = document.getElementById('sliderFill');
+    fill.style.left = pct1 + '%';
+    fill.style.width = (pct2 - pct1) + '%';
+    updateAllCharts();
+  }
+  rs.addEventListener('input', update);
+  re.addEventListener('input', update);
+  update.call(rs);
+}
+
+// ============================================================
+// MAIN CHART
+// ============================================================
+function buildMainChart() {
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  const fd = filteredData();
+  const labels = fd.map(d => fmtTime(d.time));
+  const cfg = darkChartDefaults();
+
+  // Peak PV annotation index
+  const peakIdx = fd.reduce((bi, d, i) => d.pv_kw > fd[bi].pv_kw ? i : bi, 0);
+
+  const datasets = SERIES_CONF.map(s => {
+    const vals = applySmooth(fd.map(d => d[s.field]));
+    return {
+      label: s.key,
+      data: vals,
+      borderColor: s.color,
+      backgroundColor: chartType === 'area' ? s.color + '33' : 'transparent',
+      fill: chartType === 'area',
+      tension: 0.3,
+      borderWidth: 1.8,
+      pointRadius: 0,
+      hidden: !seriesVisible[s.key],
+    };
+  });
+
+  // Zero line dataset
+  datasets.push({
+    label: '__zero',
+    data: fd.map(() => 0),
+    borderColor: '#475569',
+    borderDash: [6, 3],
+    borderWidth: 1,
+    pointRadius: 0,
+    fill: false,
+    tension: 0,
+  });
+
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      ...cfg,
+      plugins: {
+        ...cfg.plugins,
+        legend: {
+          ...cfg.plugins.legend,
+          labels: { ...cfg.plugins.legend.labels, filter: item => item.text !== '__zero' }
+        },
+        tooltip: {
+          ...cfg.plugins.tooltip,
+          callbacks: {
+            label: ctx => ctx.dataset.label !== '__zero' ? `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} kW` : null,
+            filter: item => item.dataset.label !== '__zero'
+          }
+        }
+      }
+    }
+  });
+
+  // Annotate peak — draw as a vertical line via afterDraw plugin
+  mainChart._peakIdx = peakIdx;
+}
+
+function updateMainChart() {
+  if (!mainChart) return;
+  const fd = filteredData();
+  const labels = fd.map(d => fmtTime(d.time));
+  const peakIdx = fd.reduce((bi, d, i) => d.pv_kw > fd[bi].pv_kw ? i : bi, 0);
+  mainChart._peakIdx = peakIdx;
+  SERIES_CONF.forEach((s, i) => {
+    const vals = applySmooth(fd.map(d => d[s.field]));
+    mainChart.data.datasets[i].data = vals;
+    mainChart.data.datasets[i].hidden = !seriesVisible[s.key];
+    mainChart.data.datasets[i].backgroundColor = chartType === 'area' ? s.color + '33' : 'transparent';
+    mainChart.data.datasets[i].fill = chartType === 'area';
+  });
+  mainChart.data.datasets[SERIES_CONF.length].data = fd.map(() => 0);
+  mainChart.data.labels = labels;
+  mainChart.update();
+}
+
+// ============================================================
+// SOC CHART
+// ============================================================
+function buildSOCChart() {
+  const ctx = document.getElementById('socChart').getContext('2d');
+  const fd = filteredData();
+  const labels = fd.map(d => fmtTime(d.time));
+  const socs = fd.map(d => d.soc_pct);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, 250);
+  grad.addColorStop(0, '#10B98166');
+  grad.addColorStop(0.5, '#F59E0B44');
+  grad.addColorStop(1, '#EF444433');
+
+  const minSOC = Math.min(...socs);
+  const minIdx = socs.indexOf(minSOC);
+
+  const cfg = darkChartDefaults();
+  socChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'State of Charge (%)',
+          data: socs,
+          borderColor: '#10B981',
+          backgroundColor: grad,
+          fill: true,
+          tension: 0.4,
+          borderWidth: 2,
+          pointRadius: 0,
+        },
+        { label: 'Low (20%)', data: fd.map(() => 20), borderColor: '#EF444466', borderDash: [4, 4], borderWidth: 1, pointRadius: 0, fill: false },
+        { label: 'Mid (50%)', data: fd.map(() => 50), borderColor: '#F59E0B66', borderDash: [4, 4], borderWidth: 1, pointRadius: 0, fill: false },
+        { label: 'High (80%)', data: fd.map(() => 80), borderColor: '#10B98166', borderDash: [4, 4], borderWidth: 1, pointRadius: 0, fill: false },
+      ]
+    },
+    options: {
+      ...cfg,
+      plugins: {
+        ...cfg.plugins,
+        tooltip: { ...cfg.plugins.tooltip, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y}%` } }
+      },
+      scales: {
+        ...cfg.scales,
+        y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'SOC (%)', color: '#94A3B8' } }
+      }
+    }
+  });
+}
+
+function updateSOCChart() {
+  if (!socChart) return;
+  const fd = filteredData();
+  const socs = fd.map(d => d.soc_pct);
+  socChart.data.labels = fd.map(d => fmtTime(d.time));
+  socChart.data.datasets[0].data = socs;
+  [1, 2, 3].forEach(i => socChart.data.datasets[i].data = fd.map(() => [20, 50, 80][i - 1]));
+  socChart.update();
+}
+
+// ============================================================
+// DONUT CHART
+// ============================================================
+function buildDonutChart() {
+  const pvEnergy = DATA.reduce((s, d) => s + d.pv_kw * (5/60), 0);
+  const batDischarge = DATA.reduce((s, d) => s + (d.battery_kw > 0 ? d.battery_kw * (5/60) : 0), 0);
+  const gridImport = DATA.reduce((s, d) => s + (d.grid_kw > 0 ? d.grid_kw * (5/60) : 0), 0);
+  const total = pvEnergy + batDischarge + gridImport;
+
+  const ctx = document.getElementById('donutChart').getContext('2d');
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: [
+        `PV Generation (${pvEnergy.toFixed(1)} kWh)`,
+        `Battery Discharge (${batDischarge.toFixed(1)} kWh)`,
+        `Grid Import (${gridImport.toFixed(2)} kWh)`,
+      ],
+      datasets: [{
+        data: [pvEnergy, batDischarge, gridImport],
+        backgroundColor: ['#F97316', '#8B5CF6', '#EF4444'],
+        borderColor: '#1E293B',
+        borderWidth: 3,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#94A3B8', font: { size: 10 }, padding: 8 } },
+        tooltip: {
+          backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 1,
+          callbacks: { label: c => ` ${c.label}: ${(c.parsed / total * 100).toFixed(1)}%` }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// HOURLY BAR CHART
+// ============================================================
+function buildBarChart() {
+  const hourly = {};
+  for (let h = 0; h < 24; h++) hourly[h] = { prod: [], cons: [] };
+  DATA.forEach(d => {
+    const h = parseInt(d.time.slice(11, 13));
+    hourly[h].prod.push(d.production_kw);
+    hourly[h].cons.push(d.consumption_kw);
+  });
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const prodAvg = hours.map((_, h) => hourly[h].prod.length ? hourly[h].prod.reduce((a, b) => a + b, 0) / hourly[h].prod.length : 0);
+  const consAvg = hours.map((_, h) => hourly[h].cons.length ? hourly[h].cons.reduce((a, b) => a + b, 0) / hourly[h].cons.length : 0);
+
+  const ctx = document.getElementById('barChart').getContext('2d');
+  const cfg = darkChartDefaults();
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: hours.map(h => `${h}:00`),
+      datasets: [
+        { label: 'Production', data: prodAvg, backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
+        { label: 'Consumption', data: consAvg, backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
+      ]
+    },
+    options: {
+      ...cfg,
+      plugins: {
+        ...cfg.plugins,
+        tooltip: { ...cfg.plugins.tooltip, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)} kW (avg)` } }
+      },
+      scales: {
+        ...cfg.scales,
+        x: { ...cfg.scales.x, stacked: false },
+        y: { ...cfg.scales.y, title: { display: true, text: 'Avg kW', color: '#94A3B8' } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// INSIGHTS
+// ============================================================
+function renderInsights() {
+  const pvRows = DATA.filter(d => d.pv_kw > 0);
+  const firstPV = pvRows.length ? fmtTime(pvRows[0].time) : 'N/A';
+  const peakPVRow = DATA.reduce((a, d) => d.pv_kw > a.pv_kw ? d : a, DATA[0]);
+  const peakPVTime = fmtTime(peakPVRow.time);
+  const minSOC = Math.min(...DATA.map(d => d.soc_pct));
+  const maxSOC = Math.max(...DATA.map(d => d.soc_pct));
+  const avgCons = DATA.reduce((s, d) => s + d.consumption_kw, 0) / DATA.length;
+  const maxConsRow = DATA.reduce((a, d) => d.consumption_kw > a.consumption_kw ? d : a, DATA[0]);
+  const gridIndepIntervals = DATA.filter(d => Math.abs(d.grid_kw) < 0.05).length;
+  const totalPV = DATA.reduce((s, d) => s + d.pv_kw * (5/60), 0);
+  const totalCons = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
+  const hrsAtAvgLoad = totalPV / avgCons;
+  const nightRows = DATA.filter(d => { const h = parseInt(d.time.slice(11, 13)); return h < 6; });
+  const nightBatKwh = nightRows.reduce((s, d) => s + (d.battery_kw > 0 ? d.battery_kw * (5/60) : 0), 0);
+  const pctIndep = (gridIndepIntervals / DATA.length * 100).toFixed(1);
+
+  const insights = [
+    `🌞 Solar generation began at <b>${firstPV}</b> and peaked at <b>${peakPVTime}</b> with <b>${peakPVRow.pv_kw.toFixed(2)} kW</b> peak output.`,
+    `🔋 Battery SOC swung from <b>${minSOC}%</b> to <b>${maxSOC}%</b> — a range of <b>${maxSOC - minSOC}%</b> across the day.`,
+    `🏠 Average home consumption was <b>${avgCons.toFixed(2)} kW</b>, peaking at <b>${maxConsRow.consumption_kw.toFixed(2)} kW</b> at <b>${fmtTime(maxConsRow.time)}</b>.`,
+    `⚡ The system operated grid-independently for <b>${pctIndep}%</b> of 5-minute intervals (grid draw < 0.05 kW).`,
+    `📈 Total solar energy harvested: <b>${totalPV.toFixed(1)} kWh</b> — enough to power the home for <b>${hrsAtAvgLoad.toFixed(1)} hours</b> at average load.`,
+    `🌙 During night hours (00:00–06:00), the battery supplied <b>${nightBatKwh.toFixed(2)} kWh</b> to cover home load.`,
+  ];
+  document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
+}
+
+// ============================================================
+// CONTROLS
+// ============================================================
+function setChartType(type) {
+  chartType = type;
+  document.getElementById('btnLine').classList.toggle('active', type === 'line');
+  document.getElementById('btnArea').classList.toggle('active', type === 'area');
+  updateMainChart();
+}
+
+function toggleSmooth() {
+  smoothing = !smoothing;
+  document.getElementById('btnSmooth').classList.toggle('active', smoothing);
+  updateMainChart();
+  updateSOCChart();
+}
+
+function resetFilters() {
+  document.getElementById('rangeStart').value = 0;
+  document.getElementById('rangeEnd').value = 288;
+  startIdx = 0; endIdx = DATA.length - 1;
+  SERIES_CONF.forEach(s => { seriesVisible[s.key] = true; document.getElementById(`cb_${s.key}`).checked = true; });
+  smoothing = false;
+  chartType = 'line';
+  document.getElementById('btnSmooth').classList.remove('active');
+  document.getElementById('btnLine').classList.add('active');
+  document.getElementById('btnArea').classList.remove('active');
+  document.getElementById('tStart').textContent = '00:00';
+  document.getElementById('tEnd').textContent = '24:00';
+  document.getElementById('sliderFill').style.left = '0%';
+  document.getElementById('sliderFill').style.width = '100%';
+  updateAllCharts();
+}
+
+function updateAllCharts() {
+  updateMainChart();
+  updateSOCChart();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderKPIs();
+renderSeriesToggle();
+buildMainChart();
+buildSOCChart();
+buildDonutChart();
+buildBarChart();
+renderInsights();
+initSlider();
+</script>
+</body>
+</html>
