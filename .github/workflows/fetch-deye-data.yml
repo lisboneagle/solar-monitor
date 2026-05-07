@@ -15,9 +15,9 @@ name: Fetch Deye Solar Data
 
 on:
   schedule:
-    # 21:30 UTC = 23:30 SAST (UTC+2)
-    # Adjust if your timezone offset differs (e.g. during daylight saving)
-    - cron: "30 21 * * *"
+    # Runs every 30 minutes — keeps the dashboard current throughout the day
+    # Each run takes ~15 seconds, well within GitHub Actions free tier limits
+    - cron: "*/30 * * * *"
 
   # Allow manual trigger from the Actions tab for testing
   workflow_dispatch:
@@ -30,10 +30,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
