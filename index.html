@@ -199,14 +199,16 @@
   .upload-banner {
     background: linear-gradient(135deg, #0F2744 0%, #1E293B 100%);
     border-bottom: 1px solid var(--border);
-    padding: 14px 28px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
+    padding: 12px 28px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px 24px;
+    align-items: start;
   }
+  .upload-banner-left { display: flex; flex-direction: column; gap: 8px; }
+  .upload-status-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .upload-label {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.6px;
@@ -224,8 +226,6 @@
     cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
     position: relative;
-    flex: 1;
-    min-width: 220px;
     max-width: 420px;
   }
   .upload-drop-zone:hover, .upload-drop-zone.dragover {
@@ -252,9 +252,54 @@
   .upload-hint {
     font-size: 0.72rem;
     color: #475569;
-    flex-basis: 100%;
     padding-left: 2px;
   }
+
+  /* WEATHER PANEL */
+  .weather-panel {
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+    min-width: 480px;
+    max-width: 640px;
+  }
+  .weather-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+  .weather-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+  .weather-tabs { display: flex; gap: 4px; }
+  .wx-tab {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 3px 10px;
+    border-radius: 5px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .wx-tab.active { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
+  .weather-days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .weather-days::-webkit-scrollbar { height: 3px; }
+  .weather-days::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .wx-day {
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    min-width: 72px;
+    transition: border-color 0.15s;
+  }
+  .wx-day.today { border-color: #1D4ED8; background: rgba(29,78,216,0.1); }
+  .wx-day-label { font-size: 0.62rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+  .wx-day-date { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
+  .wx-icon { font-size: 1.4rem; margin: 2px 0; }
+  .wx-temp { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+  .wx-temp-low { font-size: 0.72rem; color: var(--muted); }
+  .wx-detail { font-size: 0.68rem; color: #60A5FA; margin-top: 3px; }
+  .wx-loading { font-size: 0.78rem; color: var(--muted); padding: 8px 0; }
+  .wx-pv-hint { font-size: 0.68rem; margin-top: 2px; }
+
   .col-map-row {
     display: flex;
     gap: 10px;
@@ -297,6 +342,8 @@
 
   @media (max-width: 1100px) {
     .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+    .weather-panel { min-width: unset; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 12px; }
+    .upload-banner { grid-template-columns: 1fr; }
   }
   @media (max-width: 700px) {
     .two-col { grid-template-columns: 1fr; }
@@ -322,14 +369,34 @@
 
 <!-- UPLOAD BANNER -->
 <div class="upload-banner">
-  <span class="upload-label">📂 Load Data</span>
-  <div class="upload-drop-zone" id="dropZone">
-    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this.files[0])">
-    <span class="upload-icon">⬆️</span>
-    <div class="upload-text"><strong>Upload new dataset</strong> — drag & drop or click to browse (.xlsx, .xls, .csv)</div>
+  <div class="upload-banner-left">
+    <div class="upload-status-row">
+      <div class="upload-status idle" id="uploadStatus">⏳ Checking for latest data…</div>
+      <div class="upload-hint" id="uploadHint">Attempting to auto-load today's data from data/latest.json</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span class="upload-label">📂 Load Data</span>
+      <div class="upload-drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this.files[0])">
+        <span class="upload-icon">⬆️</span>
+        <div class="upload-text"><strong>Upload dataset</strong> — drag & drop or click (.xlsx, .xls, .csv)</div>
+      </div>
+    </div>
   </div>
-  <div class="upload-status idle" id="uploadStatus">⏳ Checking for latest data…</div>
-  <div class="upload-hint" id="uploadHint">Attempting to auto-load today's data from data/latest.json — or upload a file manually below.</div>
+  <div class="weather-panel" id="weatherPanel">
+    <div class="weather-top">
+      <span class="weather-label">🌤 7-Day Forecast</span>
+      <div class="weather-tabs">
+        <button class="wx-tab active" onclick="setWxTab('overview')">Overview</button>
+        <button class="wx-tab" onclick="setWxTab('precip')">Precipitation</button>
+        <button class="wx-tab" onclick="setWxTab('cloud')">Cloud Cover</button>
+        <button class="wx-tab" onclick="setWxTab('uv')">UV Index</button>
+      </div>
+    </div>
+    <div class="weather-days" id="weatherDays">
+      <div class="wx-loading">📡 Fetching forecast…</div>
+    </div>
+  </div>
 </div>
 
 <!-- COLUMN MAPPER (shown after upload if columns don't auto-detect) -->
@@ -1298,6 +1365,103 @@ async function loadMonthlyBilling() {
     `${daysWithData} day${daysWithData !== 1 ? 's' : ''} of data · ${seasonLabel} tariff · updated ${now.toLocaleTimeString('en-ZA', {hour:'2-digit',minute:'2-digit'})}`;
 }
 
+// ============================================================
+// WEATHER FORECAST (Open-Meteo — free, no API key)
+// ============================================================
+let wxData = null;
+let wxTab = 'overview';
+
+function wxCodeInfo(code) {
+  if (code === 0)  return { icon: '☀️',  label: 'Clear' };
+  if (code <= 2)   return { icon: '🌤️', label: 'Partly cloudy' };
+  if (code === 3)  return { icon: '☁️',  label: 'Overcast' };
+  if (code <= 49)  return { icon: '🌫️', label: 'Foggy' };
+  if (code <= 59)  return { icon: '🌦️', label: 'Drizzle' };
+  if (code <= 69)  return { icon: '🌧️', label: 'Rain' };
+  if (code <= 79)  return { icon: '🌨️', label: 'Snow' };
+  if (code <= 82)  return { icon: '🌧️', label: 'Showers' };
+  if (code <= 99)  return { icon: '⛈️',  label: 'Thunderstorm' };
+  return { icon: '🌡️', label: 'Unknown' };
+}
+
+function pvHint(cloudPct, uvIdx) {
+  const score = (1 - cloudPct / 100) * 0.6 + Math.min(uvIdx / 10, 1) * 0.4;
+  if (score > 0.75) return { text: '⚡ Excellent PV', color: '#10B981' };
+  if (score > 0.5)  return { text: '☀️ Good PV',      color: '#F59E0B' };
+  if (score > 0.25) return { text: '🌤 Moderate PV',  color: '#F97316' };
+  return             { text: '☁️ Poor PV',             color: '#94A3B8' };
+}
+
+async function loadWeather() {
+  // Vereeniging, Gauteng
+  const lat = -26.7413, lon = 27.8498;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max` +
+    `&timezone=Africa%2FJohannesburg&forecast_days=7`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('fetch failed');
+    wxData = await resp.json();
+    renderWeather();
+  } catch(e) {
+    document.getElementById('weatherDays').innerHTML =
+      `<div class="wx-loading" style="color:#F87171">⚠️ Weather unavailable</div>`;
+  }
+}
+
+function setWxTab(tab) {
+  wxTab = tab;
+  document.querySelectorAll('.wx-tab').forEach(b => {
+    const matches = b.textContent.toLowerCase().replace(/\s/g,'') === tab.toLowerCase().replace(/\s/g,'');
+    b.classList.toggle('active', matches);
+  });
+  renderWeather();
+}
+
+function renderWeather() {
+  if (!wxData) return;
+  const d = wxData.daily;
+  const today = new Date().toISOString().slice(0, 10);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const cards = d.time.map((date, i) => {
+    const dt = new Date(date + 'T12:00:00');
+    const isToday = date === today;
+    const dayLabel = isToday ? 'Today' : dayNames[dt.getDay()];
+    const dateLabel = `${dt.getDate()}/${dt.getMonth() + 1}`;
+    const info = wxCodeInfo(d.weathercode[i]);
+    const cloud = Math.round(d.cloudcover_mean?.[i] ?? 50);
+    const uv = parseFloat(d.uv_index_max?.[i] ?? 0);
+    const precip = parseFloat(d.precipitation_sum?.[i] ?? 0);
+    const hint = pvHint(cloud, uv);
+
+    let detail = '', detailColor = '#60A5FA';
+    if (wxTab === 'overview') {
+      detail = hint.text; detailColor = hint.color;
+    } else if (wxTab === 'precip') {
+      detail = `💧 ${precip.toFixed(1)} mm`;
+      detailColor = precip > 5 ? '#60A5FA' : '#94A3B8';
+    } else if (wxTab === 'cloud') {
+      detail = `☁️ ${cloud}%`;
+      detailColor = cloud > 70 ? '#94A3B8' : cloud > 40 ? '#F59E0B' : '#10B981';
+    } else if (wxTab === 'uv') {
+      detail = `🔆 UV ${uv.toFixed(1)}`;
+      detailColor = uv >= 8 ? '#EF4444' : uv >= 5 ? '#F97316' : '#10B981';
+    }
+
+    return `<div class="wx-day${isToday ? ' today' : ''}">
+      <div class="wx-day-label">${dayLabel}</div>
+      <div class="wx-day-date">${dateLabel}</div>
+      <div class="wx-icon">${info.icon}</div>
+      <div class="wx-temp">${Math.round(d.temperature_2m_max[i])}°</div>
+      <div class="wx-temp-low">${Math.round(d.temperature_2m_min[i])}°</div>
+      <div class="wx-detail" style="color:${detailColor}">${detail}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('weatherDays').innerHTML = cards;
+}
+
 
 async function init() {
   let loaded = false;
@@ -1348,6 +1512,8 @@ async function init() {
 
   // Always attempt monthly billing (works independently of daily data)
   loadMonthlyBilling();
+  // Load weather forecast
+  loadWeather();
 }
 
 init();
