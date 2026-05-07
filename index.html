@@ -343,7 +343,14 @@
   .wx-tab[data-tab="precip"].active    { background: #0EA5E9; border-color: #0EA5E9; }
   .wx-tab[data-tab="cloud"].active     { background: #6366F1; border-color: #6366F1; }
   .wx-tab[data-tab="uv"].active        { background: #EF4444; border-color: #EF4444; }
-  .weather-days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; justify-content: flex-end; width: 100%; }
+  .weather-days {
+    display: flex;
+    gap: 6px;
+    padding-bottom: 4px;
+    justify-content: flex-end;
+    width: 100%;
+    overflow-x: visible;
+  }
   .weather-days::-webkit-scrollbar { height: 3px; }
   .weather-days::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .wx-day {
@@ -451,6 +458,17 @@
     .slider-container { width: 160px; }
     .upload-banner { padding: 12px 14px; }
     .col-map-section { padding: 10px 14px; }
+    .weather-days {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      justify-content: flex-start;
+      padding-bottom: 8px;
+    }
+    .wx-day {
+      scroll-snap-align: start;
+    }
   }
 </style>
 </head>
@@ -460,7 +478,7 @@
 <div class="header">
   <div class="header-left" style="display:flex;flex-direction:column;align-items:flex-start">
     <h1 style="width:100%">☀️ Solar Energy Monitor</h1>
-    <p id="headerSubtitle" style="width:100%;text-align:left"><strong style="color:#CBD5E1;font-size:1.05rem">4 May 2026</strong><br><span style="font-size:0.82rem">·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</span></p>
+    <p id="headerSubtitle" style="width:100%;text-align:left"><strong style="color:#CBD5E1;font-size:1.05rem">4 May 2026</strong></p>
   </div>
   <div class="header-centre">
     <div class="status-badge green" id="statusBadge">🟢 System Online</div>
@@ -798,7 +816,7 @@ function loadDataFromMap(map) {
   })() : 'Uploaded Data';
 
   document.getElementById('headerSubtitle').innerHTML =
-    `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong><br><span style="font-size:0.82rem">&nbsp;·&nbsp; ${DATA.length} Readings</span>`;
+    `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong>`;
 
   // Reset controls and rebuild everything
   startIdx = 0;
