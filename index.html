@@ -315,13 +315,20 @@
   }
   .weather-top {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: flex-end;
     margin-bottom: 8px;
     gap: 12px;
     flex-wrap: nowrap;
+    width: 100%;
   }
-  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 596px; }
+  /* wrapper keeps label + days as one right-aligned block */
+  .weather-days-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; margin-bottom: 6px; }
   .weather-label { font-size: 0.9rem; color: #F1F5F9; font-weight: 700; letter-spacing: 0.3px; }
   .weather-location { font-size: 0.68rem; color: #F1F5F9; font-weight: 500; }
   .weather-tabs { display: flex; gap: 4px; }
@@ -506,10 +513,6 @@
   </div>
   <div class="weather-panel" id="weatherPanel">
     <div class="weather-top">
-      <div class="weather-label-group">
-        <span class="weather-label">🌤 7-Day Forecast</span>
-        <span class="weather-location" id="wxLocation">📍 Vereeniging, Gauteng</span>
-      </div>
       <div class="weather-tabs">
         <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
         <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
@@ -517,8 +520,14 @@
         <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
       </div>
     </div>
-    <div class="weather-days" id="weatherDays">
-      <div class="wx-loading">📡 Fetching forecast…</div>
+    <div class="weather-days-wrapper">
+      <div class="weather-label-group">
+        <span class="weather-label">🌤 7-Day Forecast</span>
+        <span class="weather-location" id="wxLocation">📍 Vereeniging, Gauteng</span>
+      </div>
+      <div class="weather-days" id="weatherDays">
+        <div class="wx-loading">📡 Fetching forecast…</div>
+      </div>
     </div>
   </div>
 </div>
