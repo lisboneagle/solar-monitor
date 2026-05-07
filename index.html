@@ -50,15 +50,15 @@
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    background: rgba(249,115,22,0.08);
-    border: 1px solid rgba(249,115,22,0.3);
+    background: rgba(232,201,116,0.08);
+    border: 1px solid rgba(232,201,116,0.3);
     border-radius: 12px;
     padding: 8px 18px;
     cursor: default;
   }
   .header-cost-label {
     font-size: 0.65rem;
-    color: #F97316;
+    color: #e8c974;
     text-transform: uppercase;
     letter-spacing: 0.6px;
     font-weight: 600;
@@ -66,7 +66,7 @@
   .header-cost-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #F97316;
+    color: #e8c974;
     line-height: 1.1;
     letter-spacing: -0.5px;
   }
@@ -311,18 +311,18 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: flex-end;
   }
   .weather-top {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin-bottom: 10px;
     gap: 10px;
     flex-wrap: wrap;
     width: 100%;
   }
-  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .weather-label-group { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
   .weather-label { font-size: 0.9rem; color: #F1F5F9; font-weight: 700; letter-spacing: 0.3px; }
   .weather-location { font-size: 0.68rem; color: #F1F5F9; font-weight: 500; }
   .weather-tabs { display: flex; gap: 4px; }
@@ -346,7 +346,7 @@
     display: flex;
     gap: 6px;
     padding-bottom: 4px;
-    justify-content: flex-start;
+    justify-content: flex-end;
     width: 100%;
     overflow-x: visible;
   }
@@ -1683,7 +1683,7 @@ async function init() {
         loadDataFromMap(identityMap);
         const dateLabel = json.date || rows[0]?.time?.slice(0, 10) || "today";
         const loadTime = new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
-        setUploadStatus(`✅ Auto-loaded at ${dateLabel} ${loadTime}`, "success");
+        setUploadStatus(`✅ Auto-loaded at ${dateLabel} | ${loadTime}`, "success");
         document.getElementById("uploadHint").innerHTML =
           `Live data loaded from data/latest.json (${rows.length} readings).<br><br><em><strong>Upload a file manually to override.</strong></em>`;
         loaded = true;
