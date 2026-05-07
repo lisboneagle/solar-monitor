@@ -200,9 +200,8 @@ try:
     print(f"  Fetching station/latest to fill gap...")
     latest_resp = post("station/latest", {"stationId": int(station_id)}, token=token)
     latest_block = latest_resp.get("data", latest_resp)
-    print(f"  station/latest raw keys: {list(latest_block.keys()) if isinstance(latest_block, dict) else type(latest_block)}")
 
-    # station/latest may return a single object or a list
+    # station/latest returns a flat object (not a list)
     latest_items = []
     if isinstance(latest_block, list):
         latest_items = latest_block
@@ -212,33 +211,27 @@ try:
                         [latest_block])
 
     for item in latest_items:
-        print(f"  Latest item keys: {list(item.keys())}")
-
-        # Try every known timestamp field — including lastUpdateTime, updateTime etc.
-        raw_t = (item.get("timeStamp") or
-                 item.get("lastUpdateTime") or
+        # lastUpdateTime is the confirmed timestamp field for station/latest
+        raw_t = (item.get("lastUpdateTime") or
+                 item.get("timeStamp") or
                  item.get("updateTime") or
                  item.get("time") or
                  item.get("collectTime") or
-                 item.get("dateTime") or
-                 item.get("lastTime") or
                  None)
 
-        print(f"  Raw timestamp value: {raw_t!r}")
-
         if raw_t is None:
-            # Last resort: use current SAST time rounded down to nearest 5 min
+            # Fallback: use current SAST time rounded down to nearest 5 min
             now_sast = datetime.now(timezone.utc) + timedelta(hours=2)
             minutes = (now_sast.minute // 5) * 5
             now_rounded = now_sast.replace(minute=minutes, second=0, microsecond=0)
             time_str = now_rounded.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠ No timestamp in response — using current SAST time: {time_str}")
+            print(f"  ⚠ No timestamp found — using current SAST time: {time_str}")
         elif isinstance(raw_t, (int, float)) or (isinstance(raw_t, str) and raw_t.replace('.','').isdigit()):
             time_str = unix_to_timestr(raw_t)
         else:
             time_str = str(raw_t).replace("T", " ")[:19]
 
-        # Skip if timestamp is empty or predates today
+        # Skip if timestamp doesn't match today
         if not time_str or time_str[:10] != target_date:
             print(f"  ⚠ Latest record date {time_str[:10]} doesn't match target {target_date} — skipping")
             continue
