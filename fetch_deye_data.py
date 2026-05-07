@@ -127,8 +127,10 @@ for endpoint, payload in attempts:
 if not history_resp:
     raise RuntimeError("All history endpoints failed.")
 
-data_block  = history_resp.get("data", {})
-raw_records = (data_block.get("list") or data_block.get("infos") or
+data_block  = history_resp.get("data", history_resp)
+raw_records = (data_block.get("stationDataItems") or
+               data_block.get("list") or
+               data_block.get("infos") or
                data_block.get("records") or
                (data_block if isinstance(data_block, list) else []))
 print(f"  ✓ Received {len(raw_records)} records")
@@ -145,12 +147,22 @@ FIELD_MAP = {
     "wirePower":        "grid_kw",
     "gridPower":        "grid_kw",
     "batteryPower":     "battery_kw",
+    "dischargePower":   "battery_kw",
+    "batterySOC":       "soc_pct",
     "SOC":              "soc_pct",
     "soc":              "soc_pct",
     "batterySoc":       "soc_pct",
     "pvPower":          "pv_kw",
     "generatorPower":   "generator_kw",
 }
+
+def unix_to_timestr(ts):
+    """Convert Unix timestamp to 'YYYY-MM-DD HH:MM:SS' string."""
+    try:
+        dt = datetime.fromtimestamp(float(ts), tz=timezone.utc) + timedelta(hours=2)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError, OSError):
+        return str(ts)
 
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
@@ -160,18 +172,26 @@ def normalise(r, time_str):
         if k in r and r[k] is not None:
             try:
                 val = float(r[k])
+                # Convert W → kW if values look like watts
                 if dk != "soc_pct" and abs(val) > 200:
                     val = round(val / 1000, 3)
                 out[dk] = val
             except (ValueError, TypeError):
                 pass
+    # production_kw mirrors pv_kw if not set separately
+    if out["production_kw"] == 0.0 and out["pv_kw"] > 0:
+        out["production_kw"] = out["pv_kw"]
     return out
 
 rows = []
 for rec in raw_records:
-    t = (rec.get("time") or rec.get("collectTime") or
-         rec.get("dateTime") or rec.get("date") or "")
-    rows.append(normalise(rec, str(t).replace("T", " ")[:19]))
+    # Handle Unix timestamp (float) or string date
+    t = rec.get("timeStamp") or rec.get("time") or rec.get("collectTime") or rec.get("dateTime") or ""
+    if t and isinstance(t, (int, float)) or (isinstance(t, str) and t.replace('.','').isdigit()):
+        time_str = unix_to_timestr(t)
+    else:
+        time_str = str(t).replace("T", " ")[:19]
+    rows.append(normalise(rec, time_str))
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Normalised {len(rows)} rows")
