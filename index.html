@@ -35,7 +35,7 @@
     gap: 12px;
   }
   .header-left h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
-  .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 2px; max-width: fit-content; }
+  .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; max-width: fit-content; padding-left: 2.2rem; line-height: 1.6; }
   .header-centre {
     display: flex;
     justify-content: center;
@@ -210,7 +210,7 @@
     padding: 20px;
     margin-bottom: 20px;
   }
-  .chart-title { font-size: 0.85rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 14px; }
+  .chart-title { font-size: 0.92rem; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 14px; }
   .chart-wrap { position: relative; height: 300px; }
   .chart-wrap-tall { position: relative; height: 250px; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
@@ -223,7 +223,7 @@
     padding: 20px 24px;
     margin-bottom: 20px;
   }
-  .insights-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; }
+  .insights-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 14px; color: var(--text); }
   .insight-item {
     padding: 10px 0;
     border-bottom: 1px solid var(--border);
@@ -460,7 +460,7 @@
 <div class="header">
   <div class="header-left" style="display:flex;flex-direction:column;align-items:flex-start">
     <h1 style="width:100%">☀️ Solar Energy Monitor</h1>
-    <p id="headerSubtitle" style="width:100%;text-align:left">4 May 2026 &nbsp;·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</p>
+    <p id="headerSubtitle" style="width:100%;text-align:left"><strong style="color:#CBD5E1;font-size:1.05rem">4 May 2026</strong><br><span style="font-size:0.82rem">·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</span></p>
   </div>
   <div class="header-centre">
     <div class="status-badge green" id="statusBadge">🟢 System Online</div>
@@ -798,7 +798,7 @@ function loadDataFromMap(map) {
   })() : 'Uploaded Data';
 
   document.getElementById('headerSubtitle').innerHTML =
-    `${prettyDate} &nbsp;·&nbsp; ${DATA.length} Readings`;
+    `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong><br><span style="font-size:0.82rem">&nbsp;·&nbsp; ${DATA.length} Readings</span>`;
 
   // Reset controls and rebuild everything
   startIdx = 0;
@@ -1634,8 +1634,8 @@ async function init() {
         loadDataFromMap(identityMap);
         const dateLabel = json.date || rows[0]?.time?.slice(0, 10) || "today";
         setUploadStatus(`✅ Auto-loaded data for ${dateLabel}`, "success");
-        document.getElementById("uploadHint").textContent =
-          `Live data loaded from data/latest.json (${rows.length} readings). Upload a file manually to override.`;
+        document.getElementById("uploadHint").innerHTML =
+          `Live data loaded from data/latest.json (${rows.length} readings).<br><em><strong>Upload a file manually to override.</strong></em>`;
         loaded = true;
       }
     }
