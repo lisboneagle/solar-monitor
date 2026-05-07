@@ -1393,7 +1393,6 @@ async function loadMonthlyBilling() {
   const seasonLabel = isSummer(month) ? 'Summer' : 'Winter';
 
   // Fetch all available daily archive files for this month
-  const dailyGridKwh = [];
   const fetchPromises = [];
 
   for (let d = 1; d <= dayOfMonth; d++) {
@@ -1403,42 +1402,49 @@ async function loadMonthlyBilling() {
       fetch(`data/${dateKey}.json`, { cache: 'no-store' })
         .then(r => r.ok ? r.json() : null)
         .then(json => {
-          if (!json || !json.rows || json.rows.length === 0) return { date: dateKey, kwh: 0 };
-          const kwh = json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
-          return { date: dateKey, kwh };
+          if (!json || !json.rows || json.rows.length === 0) return { date: dateKey, gridKwh: 0, consKwh: 0, hasData: false };
+          const gridKwh = json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
+          const consKwh = json.rows.reduce((s, r) => s + Math.max(0, r.consumption_kw || 0) * (5/60), 0);
+          return { date: dateKey, gridKwh, consKwh, hasData: true };
         })
-        .catch(() => ({ date: dateKey, kwh: 0 }))
+        .catch(() => ({ date: dateKey, gridKwh: 0, consKwh: 0, hasData: false }))
     );
   }
 
   const results = await Promise.all(fetchPromises);
   results.sort((a, b) => a.date.localeCompare(b.date));
 
-  const daysWithData = results.filter(r => r.kwh > 0).length;
-  const mtdKwh = results.reduce((s, r) => s + r.kwh, 0);
-  const avgDailyKwh = daysWithData > 0 ? mtdKwh / daysWithData : 0;
-  const projectedKwh = avgDailyKwh * daysInMonth;
+  const daysWithData    = results.filter(r => r.hasData).length;
+  const daysRemaining   = daysInMonth - daysWithData;
 
-  const mtdCostCents = calcTieredCost(mtdKwh, tiers);
-  const projCostCents = calcTieredCost(projectedKwh, tiers);
+  // MTD actuals
+  const mtdKwh          = results.reduce((s, r) => s + r.gridKwh, 0);
+  const mtdConsKwh      = results.reduce((s, r) => s + r.consKwh, 0);
 
-  // Savings = what you would have paid without solar (all consumption from grid) minus actual grid cost
-  const mtdTotalConsKwh = results.reduce((s, r) => {
-    // We only have grid data in archive — use grid as proxy for now,
-    // but if DATA is loaded for today we can compute full consumption
-    return s + r.kwh; // conservative: grid used is what we saved against
-  }, 0);
+  // Daily averages from recorded days only
+  const avgDailyGridKwh = daysWithData > 0 ? mtdKwh / daysWithData : 0;
+  const avgDailyConsKwh = daysWithData > 0 ? mtdConsKwh / daysWithData : 0;
 
-  // Better: compute what full consumption cost would be vs actual grid cost
-  // We use the ratio from today's loaded data to estimate total consumption MTD
-  const todayGridKwh = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw || 0) * (5/60), 0);
-  const todayConsKwh = DATA.reduce((s, d) => s + (d.consumption_kw || 0) * (5/60), 0);
-  const solarFraction = todayConsKwh > 0 ? Math.max(0, 1 - todayGridKwh / todayConsKwh) : 0;
-  const mtdEstConsKwh = todayConsKwh > 0 ? mtdKwh / (1 - solarFraction || 1) : mtdKwh;
-  const mtdNoSolarCostCents = calcTieredCost(mtdEstConsKwh, tiers);
-  const mtdSavingsCents = mtdNoSolarCostCents - mtdCostCents;
-  const dailySavingsCents = daysWithData > 0 ? mtdSavingsCents / daysWithData : 0;
-  const projSavingsCents = dailySavingsCents * daysInMonth;
+  // Projected full-month totals:
+  // actual MTD + (avg daily × remaining days)
+  const projectedKwh       = mtdKwh     + avgDailyGridKwh * daysRemaining;
+  const projectedConsKwh   = mtdConsKwh + avgDailyConsKwh * daysRemaining;
+
+  // Cost calculations
+  const mtdCostCents       = calcTieredCost(mtdKwh, tiers);
+  const projCostCents      = calcTieredCost(projectedKwh, tiers);
+
+  // Savings = what you would have paid if ALL consumption came from the grid
+  //           minus what you actually paid (grid only)
+  // MTD savings
+  const mtdNoSolarCostCents = calcTieredCost(mtdConsKwh, tiers);
+  const mtdSavingsCents     = Math.max(0, mtdNoSolarCostCents - mtdCostCents);
+  const avgDailySavingsCents = daysWithData > 0 ? mtdSavingsCents / daysWithData : 0;
+
+  // Projected monthly savings:
+  // actual MTD savings + projected savings for remaining days (at avg daily savings rate)
+  const projNoSolarCostCents = calcTieredCost(projectedConsKwh, tiers);
+  const projSavingsCents     = Math.max(0, projNoSolarCostCents - projCostCents);
 
   // Tier breakdown for MTD
   function tierBreakdown(kWh, tiers) {
@@ -1465,14 +1471,14 @@ async function loadMonthlyBilling() {
 
   // Render KPI mini-cards
   document.getElementById('billingKpis').innerHTML = [
-    { label: 'MTD Grid Usage',        value: mtdKwh.toFixed(1),          unit: 'kWh',     color: '#EF4444' },
-    { label: 'MTD Grid Cost',         value: formatRand(mtdCostCents),    unit: '',        color: '#F97316' },
-    { label: 'Projected Monthly',     value: projectedKwh.toFixed(0),    unit: 'kWh',     color: '#8B5CF6' },
-    { label: 'Projected Cost',        value: formatRand(projCostCents),   unit: '',        color: '#14B8A6' },
-    { label: 'Avg Daily Grid',        value: avgDailyKwh.toFixed(2),     unit: 'kWh/day', color: '#3B82F6' },
-    { label: 'Days Recorded',         value: `${daysWithData}/${dayOfMonth}`, unit: 'days', color: '#10B981' },
-    { label: 'Daily Savings',         value: formatRand(dailySavingsCents),  unit: '/day', color: '#34D399' },
-    { label: 'Proj. Monthly Savings', value: formatRand(projSavingsCents),   unit: '',    color: '#A78BFA' },
+    { label: 'MTD Grid Usage',        value: mtdKwh.toFixed(1),              unit: 'kWh',     color: '#EF4444' },
+    { label: 'MTD Grid Cost',         value: formatRand(mtdCostCents),        unit: '',        color: '#F97316' },
+    { label: 'Projected Monthly',     value: projectedKwh.toFixed(0),         unit: 'kWh',     color: '#8B5CF6' },
+    { label: 'Projected Cost',        value: formatRand(projCostCents),        unit: '',        color: '#14B8A6' },
+    { label: 'Avg Daily Grid',        value: avgDailyGridKwh.toFixed(2),      unit: 'kWh/day', color: '#3B82F6' },
+    { label: 'Days Recorded',         value: `${daysWithData}/${dayOfMonth}`, unit: 'days',    color: '#10B981' },
+    { label: 'Daily Savings',         value: formatRand(avgDailySavingsCents), unit: '/day',   color: '#34D399' },
+    { label: 'Proj. Monthly Savings', value: formatRand(projSavingsCents),     unit: '',       color: '#A78BFA' },
   ].map(c => `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-top:3px solid ${c.color}">
       <div style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">${c.label}</div>
@@ -1504,9 +1510,12 @@ async function loadMonthlyBilling() {
       </tr>
     </table>
     <div style="margin-top:10px;font-size:0.72rem;color:var(--muted);border-top:1px solid var(--border);padding-top:8px">
-      📈 Projection based on ${daysWithData} day${daysWithData !== 1 ? 's' : ''} of data · avg ${avgDailyKwh.toFixed(2)} kWh/day · 
-      estimated <strong style="color:var(--text)">${projectedKwh.toFixed(0)} kWh</strong> for full month of ${daysInMonth} days ·
-      projected cost <strong style="color:#14B8A6">${formatRand(projCostCents)}</strong> · VAT incl · ${seasonLabel} rates
+      📈 Projection based on <strong style="color:var(--text)">${daysWithData}</strong> recorded day${daysWithData !== 1 ? 's' : ''} · avg grid <strong style="color:var(--text)">${avgDailyGridKwh.toFixed(2)} kWh/day</strong> ·
+      <strong style="color:var(--text)">${daysRemaining}</strong> day${daysRemaining !== 1 ? 's' : ''} remaining ·
+      projected total <strong style="color:var(--text)">${projectedKwh.toFixed(0)} kWh</strong> ·
+      projected cost <strong style="color:#14B8A6">${formatRand(projCostCents)}</strong> ·
+      projected saving <strong style="color:#A78BFA">${formatRand(projSavingsCents)}</strong> ·
+      VAT incl · ${seasonLabel} rates
     </div>`;
 
   document.getElementById('billingStatus').textContent =
