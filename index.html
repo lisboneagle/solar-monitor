@@ -309,9 +309,22 @@
     padding-left: 20px;
     min-width: 0;
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
   }
-  .weather-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
+  .weather-top {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+    gap: 10px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .weather-label-group { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
   .weather-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
+  .weather-location { font-size: 0.68rem; color: #475569; }
   .weather-tabs { display: flex; gap: 4px; }
   .wx-tab {
     background: transparent;
@@ -325,28 +338,39 @@
     transition: all 0.15s;
   }
   .wx-tab.active { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
-  .weather-days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .wx-tab[data-tab="overview"].active  { background: #1D4ED8; border-color: #1D4ED8; }
+  .wx-tab[data-tab="precip"].active    { background: #0EA5E9; border-color: #0EA5E9; }
+  .wx-tab[data-tab="cloud"].active     { background: #6366F1; border-color: #6366F1; }
+  .wx-tab[data-tab="uv"].active        { background: #EF4444; border-color: #EF4444; }
+  .weather-days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; justify-content: flex-end; width: 100%; }
   .weather-days::-webkit-scrollbar { height: 3px; }
   .weather-days::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .wx-day {
     flex-shrink: 0;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
     text-align: center;
-    min-width: 72px;
-    transition: border-color 0.15s;
+    min-width: 74px;
+    transition: all 0.2s;
+    border: 1px solid transparent;
   }
-  .wx-day.today { border-color: #1D4ED8; background: rgba(29,78,216,0.1); }
+  /* per-tab card colour themes */
+  .wx-day.theme-overview  { background: rgba(255,255,255,0.04); border-color: var(--border); }
+  .wx-day.theme-precip    { background: rgba(14,165,233,0.07);  border-color: rgba(14,165,233,0.25); }
+  .wx-day.theme-cloud     { background: rgba(99,102,241,0.07);  border-color: rgba(99,102,241,0.25); }
+  .wx-day.theme-uv        { background: rgba(239,68,68,0.07);   border-color: rgba(239,68,68,0.25); }
+  /* today highlight inherits theme tint but stronger */
+  .wx-day.today.theme-overview { border-color: #1D4ED8; background: rgba(29,78,216,0.12); }
+  .wx-day.today.theme-precip   { border-color: #0EA5E9; background: rgba(14,165,233,0.18); }
+  .wx-day.today.theme-cloud    { border-color: #6366F1; background: rgba(99,102,241,0.18); }
+  .wx-day.today.theme-uv       { border-color: #EF4444; background: rgba(239,68,68,0.18); }
   .wx-day-label { font-size: 0.62rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
-  .wx-day-date { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
-  .wx-icon { font-size: 1.4rem; margin: 2px 0; }
-  .wx-temp { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+  .wx-day-date  { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
+  .wx-icon  { font-size: 1.4rem; margin: 2px 0; }
+  .wx-temp  { font-size: 0.82rem; font-weight: 700; color: var(--text); }
   .wx-temp-low { font-size: 0.72rem; color: var(--muted); }
-  .wx-detail { font-size: 0.68rem; color: #60A5FA; margin-top: 3px; }
+  .wx-detail { font-size: 0.68rem; margin-top: 3px; font-weight: 600; }
   .wx-loading { font-size: 0.78rem; color: var(--muted); padding: 8px 0; }
-  .wx-pv-hint { font-size: 0.68rem; margin-top: 2px; }
 
   .col-map-row {
     display: flex;
@@ -448,12 +472,15 @@
   </div>
   <div class="weather-panel" id="weatherPanel">
     <div class="weather-top">
-      <span class="weather-label">🌤 7-Day Forecast</span>
+      <div class="weather-label-group">
+        <span class="weather-label">🌤 7-Day Forecast</span>
+        <span class="weather-location" id="wxLocation">📍 Vereeniging, Gauteng</span>
+      </div>
       <div class="weather-tabs">
-        <button class="wx-tab active" onclick="setWxTab('overview')">Overview</button>
-        <button class="wx-tab" onclick="setWxTab('precip')">Precipitation</button>
-        <button class="wx-tab" onclick="setWxTab('cloud')">Cloud Cover</button>
-        <button class="wx-tab" onclick="setWxTab('uv')">UV Index</button>
+        <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
+        <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
+        <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
+        <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
       </div>
     </div>
     <div class="weather-days" id="weatherDays">
@@ -1439,6 +1466,14 @@ async function loadMonthlyBilling() {
 let wxData = null;
 let wxTab = 'overview';
 
+// Tab accent colours
+const WX_TAB_COLORS = {
+  overview: '#1D4ED8',
+  precip:   '#0EA5E9',
+  cloud:    '#6366F1',
+  uv:       '#EF4444',
+};
+
 function wxCodeInfo(code) {
   if (code === 0)  return { icon: '☀️',  label: 'Clear' };
   if (code <= 2)   return { icon: '🌤️', label: 'Partly cloudy' };
@@ -1461,8 +1496,25 @@ function pvHint(cloudPct, uvIdx) {
 }
 
 async function loadWeather() {
-  // Vereeniging, Gauteng
   const lat = -26.7413, lon = 27.8498;
+
+  // Reverse geocode to get readable location name
+  try {
+    const geoResp = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    if (geoResp.ok) {
+      const geo = await geoResp.json();
+      const city = geo.address?.city || geo.address?.town || geo.address?.suburb || geo.address?.county || '';
+      const region = geo.address?.state || '';
+      if (city || region) {
+        document.getElementById('wxLocation').textContent = `📍 ${[city, region].filter(Boolean).join(', ')}`;
+      }
+    }
+  } catch(e) { /* keep default location text */ }
+
+  // Fetch forecast
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max` +
     `&timezone=Africa%2FJohannesburg&forecast_days=7`;
@@ -1480,8 +1532,7 @@ async function loadWeather() {
 function setWxTab(tab) {
   wxTab = tab;
   document.querySelectorAll('.wx-tab').forEach(b => {
-    const matches = b.textContent.toLowerCase().replace(/\s/g,'') === tab.toLowerCase().replace(/\s/g,'');
-    b.classList.toggle('active', matches);
+    b.classList.toggle('active', b.dataset.tab === tab);
   });
   renderWeather();
 }
@@ -1491,6 +1542,8 @@ function renderWeather() {
   const d = wxData.daily;
   const today = new Date().toISOString().slice(0, 10);
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const themeClass = `theme-${wxTab}`;
+  const accentColor = WX_TAB_COLORS[wxTab];
 
   const cards = d.time.map((date, i) => {
     const dt = new Date(date + 'T12:00:00');
@@ -1503,21 +1556,34 @@ function renderWeather() {
     const precip = parseFloat(d.precipitation_sum?.[i] ?? 0);
     const hint = pvHint(cloud, uv);
 
-    let detail = '', detailColor = '#60A5FA';
+    let detail = '', detailColor = accentColor;
+
     if (wxTab === 'overview') {
-      detail = hint.text; detailColor = hint.color;
+      detail = hint.text;
+      detailColor = hint.color;
     } else if (wxTab === 'precip') {
-      detail = `💧 ${precip.toFixed(1)} mm`;
-      detailColor = precip > 5 ? '#60A5FA' : '#94A3B8';
+      const bar = precip === 0 ? '○○○○○' :
+                  precip < 2  ? '●○○○○' :
+                  precip < 5  ? '●●○○○' :
+                  precip < 10 ? '●●●○○' :
+                  precip < 20 ? '●●●●○' : '●●●●●';
+      detail = `💧 ${precip.toFixed(1)}mm ${bar}`;
+      detailColor = precip > 15 ? '#60A5FA' : precip > 5 ? '#7DD3FC' : precip > 0 ? '#BAE6FD' : '#475569';
     } else if (wxTab === 'cloud') {
-      detail = `☁️ ${cloud}%`;
-      detailColor = cloud > 70 ? '#94A3B8' : cloud > 40 ? '#F59E0B' : '#10B981';
+      const bar = cloud < 10 ? '○○○○○' :
+                  cloud < 30 ? '●○○○○' :
+                  cloud < 50 ? '●●○○○' :
+                  cloud < 70 ? '●●●○○' :
+                  cloud < 90 ? '●●●●○' : '●●●●●';
+      detail = `${bar} ${cloud}%`;
+      detailColor = cloud > 70 ? '#818CF8' : cloud > 40 ? '#A5B4FC' : '#C7D2FE';
     } else if (wxTab === 'uv') {
-      detail = `🔆 UV ${uv.toFixed(1)}`;
-      detailColor = uv >= 8 ? '#EF4444' : uv >= 5 ? '#F97316' : '#10B981';
+      const uvLabel = uv < 3 ? 'Low' : uv < 6 ? 'Moderate' : uv < 8 ? 'High' : uv < 11 ? 'V.High' : 'Extreme';
+      detail = `🔆 ${uv.toFixed(1)} ${uvLabel}`;
+      detailColor = uv >= 11 ? '#EF4444' : uv >= 8 ? '#F97316' : uv >= 6 ? '#F59E0B' : uv >= 3 ? '#84CC16' : '#10B981';
     }
 
-    return `<div class="wx-day${isToday ? ' today' : ''}">
+    return `<div class="wx-day ${themeClass}${isToday ? ' today' : ''}">
       <div class="wx-day-label">${dayLabel}</div>
       <div class="wx-day-date">${dateLabel}</div>
       <div class="wx-icon">${info.icon}</div>
