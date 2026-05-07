@@ -82,8 +82,9 @@ station_id = STATION_ID.strip()
 if not station_id:
     print("  DEYE_STATION_ID not set — fetching station list...")
     stations = post("station/list", {"page": 1, "size": 10}, token=token)
-    items = (stations.get("data", {}).get("list") or
-             stations.get("data", {}).get("infos") or
+    items = (stations.get("stationList") or
+             stations.get("data", {}).get("list") or
+             stations.get("data", {}).get("stationList") or
              stations.get("list") or [])
     if not items:
         raise RuntimeError(f"No stations found. Full response: {json.dumps(stations)[:500]}")
