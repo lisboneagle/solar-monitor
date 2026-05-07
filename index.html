@@ -311,7 +311,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: stretch;
   }
   .weather-top {
     display: flex;
@@ -319,10 +319,10 @@
     justify-content: space-between;
     margin-bottom: 10px;
     gap: 10px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     width: 100%;
   }
-  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding-right: 8px; }
+  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
   .weather-label { font-size: 0.9rem; color: #F1F5F9; font-weight: 700; letter-spacing: 0.3px; }
   .weather-location { font-size: 0.68rem; color: #F1F5F9; font-weight: 500; }
   .weather-tabs { display: flex; gap: 4px; }
@@ -346,20 +346,19 @@
     display: flex;
     gap: 6px;
     padding-bottom: 4px;
-    justify-content: flex-end;
+    justify-content: space-between;
     width: 100%;
     overflow-x: visible;
   }
   .weather-days::-webkit-scrollbar { height: 3px; }
   .weather-days::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .wx-day {
-    flex-shrink: 0;
+    flex: 1;
     border-radius: 8px;
     padding: 8px 6px;
     text-align: center;
-    width: 82px;
-    min-width: 82px;
-    max-width: 82px;
+    min-width: 70px;
+    max-width: 100px;
     height: 118px;
     min-height: 118px;
     transition: background 0.2s, border-color 0.2s;
@@ -505,6 +504,7 @@
         <div class="upload-text"><strong>Upload</strong> .xlsx / .xls / .csv</div>
       </div>
     </div>
+    <div id="uploadOverrideHint" style="font-size:0.72rem;color:#475569;font-style:italic;font-weight:600;display:none"><em><strong>Upload a file manually to override.</strong></em></div>
   </div>
   <div class="weather-panel" id="weatherPanel">
     <div class="weather-top">
@@ -1685,7 +1685,9 @@ async function init() {
         const loadTime = new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
         setUploadStatus(`✅ Auto-loaded at ${dateLabel} | ${loadTime}`, "success");
         document.getElementById("uploadHint").innerHTML =
-          `Live data loaded from data/latest.json (${rows.length} readings).<br><br><em><strong>Upload a file manually to override.</strong></em>`;
+          `Live data loaded from data/latest.json (${rows.length} readings).`;
+        const overrideHint = document.getElementById("uploadOverrideHint");
+        if (overrideHint) overrideHint.style.display = 'block';
         loaded = true;
       }
     }
