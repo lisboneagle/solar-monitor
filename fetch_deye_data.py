@@ -196,32 +196,54 @@ if rows:
     print(f"  Last history record: {rows[-1]['time']}")
 
 # ── Step 5b: Fetch station/latest to fill gap between history lag and now ─────
-# The station/history endpoint often lags 4-8 hours behind real time.
-# station/latest returns the most recent reading — we append it if it's
-# more recent than the last history record.
 try:
     print(f"  Fetching station/latest to fill gap...")
     latest_resp = post("station/latest", {"stationId": int(station_id)}, token=token)
     latest_block = latest_resp.get("data", latest_resp)
+    print(f"  station/latest raw keys: {list(latest_block.keys()) if isinstance(latest_block, dict) else type(latest_block)}")
 
     # station/latest may return a single object or a list
     latest_items = []
     if isinstance(latest_block, list):
         latest_items = latest_block
     elif isinstance(latest_block, dict):
-        # Could be nested under stationDataItems or similar
         latest_items = (latest_block.get("stationDataItems") or
                         latest_block.get("list") or
                         [latest_block])
 
     for item in latest_items:
-        t = item.get("timeStamp") or item.get("time") or item.get("collectTime") or ""
-        if t and (isinstance(t, (int, float)) or (isinstance(t, str) and t.replace('.','').isdigit())):
-            time_str = unix_to_timestr(t)
-        else:
-            time_str = str(t).replace("T", " ")[:19]
+        print(f"  Latest item keys: {list(item.keys())}")
 
-        # Only append if this record is more recent than the last history record
+        # Try every known timestamp field — including lastUpdateTime, updateTime etc.
+        raw_t = (item.get("timeStamp") or
+                 item.get("lastUpdateTime") or
+                 item.get("updateTime") or
+                 item.get("time") or
+                 item.get("collectTime") or
+                 item.get("dateTime") or
+                 item.get("lastTime") or
+                 None)
+
+        print(f"  Raw timestamp value: {raw_t!r}")
+
+        if raw_t is None:
+            # Last resort: use current SAST time rounded down to nearest 5 min
+            now_sast = datetime.now(timezone.utc) + timedelta(hours=2)
+            minutes = (now_sast.minute // 5) * 5
+            now_rounded = now_sast.replace(minute=minutes, second=0, microsecond=0)
+            time_str = now_rounded.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"  ⚠ No timestamp in response — using current SAST time: {time_str}")
+        elif isinstance(raw_t, (int, float)) or (isinstance(raw_t, str) and raw_t.replace('.','').isdigit()):
+            time_str = unix_to_timestr(raw_t)
+        else:
+            time_str = str(raw_t).replace("T", " ")[:19]
+
+        # Skip if timestamp is empty or predates today
+        if not time_str or time_str[:10] != target_date:
+            print(f"  ⚠ Latest record date {time_str[:10]} doesn't match target {target_date} — skipping")
+            continue
+
+        # Only append if more recent than last history record
         if not rows or time_str > rows[-1]["time"]:
             rows.append(normalise(item, time_str))
             print(f"  ✓ Appended latest record at {time_str}")
