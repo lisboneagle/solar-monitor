@@ -81,11 +81,12 @@ print(f"  ✓ Token obtained")
 station_id = STATION_ID.strip()
 if not station_id:
     print("  DEYE_STATION_ID not set — fetching station list...")
-    stations = post("station/v1.0/list", {"page": 1, "size": 10}, token=token)
-    items = (stations["data"].get("list") or
-             stations["data"].get("infos") or [])
+    stations = post("station/list", {"page": 1, "size": 10}, token=token)
+    items = (stations.get("data", {}).get("list") or
+             stations.get("data", {}).get("infos") or
+             stations.get("list") or [])
     if not items:
-        raise RuntimeError("No stations found.")
+        raise RuntimeError(f"No stations found. Full response: {json.dumps(stations)[:500]}")
     station_id = str(items[0].get("id") or items[0].get("stationId"))
     print(f"  ✓ Available stations: {[str(s.get('id') or s.get('stationId')) for s in items]}")
     print(f"  ✓ Using station: {station_id}  ← add this as DEYE_STATION_ID secret")
@@ -98,17 +99,17 @@ print(f"  Fetching data for {target_date} (station {station_id})...")
 # ── Step 4: Fetch 5-minute history ───────────────────────────────────────────
 history_resp = None
 attempts = [
-    ("station/v1.0/history", {
+    ("station/history", {
         "stationId": station_id,
         "startTime": f"{target_date} 00:00:00",
         "endTime":   f"{target_date} 23:59:59",
         "timeType":  1,
     }),
-    ("station/v1.0/day", {
+    ("station/day", {
         "stationId": station_id,
         "time": target_date,
     }),
-    ("station/history", {
+    ("device/history", {
         "stationId": station_id,
         "startTime": f"{target_date} 00:00:00",
         "endTime":   f"{target_date} 23:59:59",
