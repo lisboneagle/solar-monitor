@@ -353,8 +353,8 @@
         <span class="slider-time" id="tStart">00:00</span>
         <div class="slider-container" id="sliderWrap">
           <div class="slider-track"><div class="slider-fill" id="sliderFill"></div></div>
-          <input type="range" id="rangeStart" min="0" max="288" value="0" step="1">
-          <input type="range" id="rangeEnd" min="0" max="288" value="288" step="1">
+          <input type="range" id="rangeStart" min="0" max="288" value="0" step="1" oninput="onSliderMove()">
+          <input type="range" id="rangeEnd" min="0" max="288" value="288" step="1" oninput="onSliderMove()">
         </div>
         <span class="slider-time" id="tEnd">24:00</span>
       </div>
@@ -804,7 +804,17 @@ function toggleSeries(key) {
 // ============================================================
 // SLIDER
 // ============================================================
-let sliderInitialised = false;
+function onSliderMove() {
+  const rs = document.getElementById('rangeStart');
+  const re = document.getElementById('rangeEnd');
+  let s = parseInt(rs.value);
+  let e = parseInt(re.value);
+  if (s > e) { rs.value = e; s = e; }
+  startIdx = s;
+  endIdx = e;
+  updateSliderUI();
+  updateAllCharts();
+}
 
 function initSlider() {
   const maxIdx = DATA.length - 1;
@@ -817,24 +827,6 @@ function initSlider() {
   startIdx = 0;
   endIdx = maxIdx;
   updateSliderUI();
-
-  if (!sliderInitialised) {
-    document.getElementById('sliderWrap').addEventListener('input', function(e) {
-      const rs = document.getElementById('rangeStart');
-      const re = document.getElementById('rangeEnd');
-      let s = parseInt(rs.value);
-      let e2 = parseInt(re.value);
-      if (s > e2) {
-        if (e.target === rs) { rs.value = e2; s = e2; }
-        else { re.value = s; e2 = s; }
-      }
-      startIdx = s;
-      endIdx = e2;
-      updateSliderUI();
-      updateAllCharts();
-    });
-    sliderInitialised = true;
-  }
 }
 
 function updateSliderUI() {
@@ -842,14 +834,12 @@ function updateSliderUI() {
   const re = document.getElementById('rangeEnd');
   const s = parseInt(rs.value);
   const e = parseInt(re.value);
-  const maxIdx = DATA.length - 1;
+  const maxIdx = Math.max(DATA.length - 1, 1);
   document.getElementById('tStart').textContent = idxToTime(s);
-  document.getElementById('tEnd').textContent = e >= maxIdx ? '24:00' : idxToTime(e);
-  const pct1 = s / maxIdx * 100;
-  const pct2 = e / maxIdx * 100;
+  document.getElementById('tEnd').textContent = e >= DATA.length - 1 ? '24:00' : idxToTime(e);
   const fill = document.getElementById('sliderFill');
-  fill.style.left = pct1 + '%';
-  fill.style.width = (pct2 - pct1) + '%';
+  fill.style.left  = (s / maxIdx * 100) + '%';
+  fill.style.width = ((e - s) / maxIdx * 100) + '%';
 }
 
 // ============================================================
