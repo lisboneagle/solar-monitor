@@ -239,7 +239,57 @@
   }
   .insight-item:last-child { border-bottom: none; }
 
-  /* UPLOAD BANNER */
+  /* PWA INSTALL PROMPT */
+  .install-prompt {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 16px 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 9999;
+    width: calc(100% - 32px);
+    max-width: 420px;
+    animation: slideUp 0.3s ease;
+  }
+  .install-prompt.visible { display: flex; flex-direction: column; gap: 12px; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .install-prompt-top { display: flex; align-items: center; gap: 12px; }
+  .install-prompt-icon { font-size: 2rem; flex-shrink: 0; }
+  .install-prompt-text h3 { font-size: 0.95rem; font-weight: 700; color: #F1F5F9; margin-bottom: 2px; }
+  .install-prompt-text p  { font-size: 0.78rem; color: #94A3B8; line-height: 1.4; }
+  .install-prompt-actions { display: flex; gap: 10px; }
+  .install-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.15s;
+  }
+  .install-btn:hover { opacity: 0.85; }
+  .install-btn-primary { background: #1D4ED8; color: #fff; }
+  .install-btn-secondary { background: #334155; color: #94A3B8; }
+  /* iOS instruction banner (shown instead on Safari iOS) */
+  .ios-install-hint {
+    display: none;
+    font-size: 0.76rem;
+    color: #94A3B8;
+    text-align: center;
+    line-height: 1.5;
+    padding: 6px 0 0;
+    border-top: 1px solid #334155;
+  }
   .upload-banner {
     background: linear-gradient(135deg, #0F2744 0%, #1E293B 100%);
     border-bottom: 1px solid var(--border);
@@ -487,6 +537,24 @@
 </style>
 </head>
 <body>
+
+<!-- PWA INSTALL PROMPT -->
+<div class="install-prompt" id="installPrompt">
+  <div class="install-prompt-top">
+    <div class="install-prompt-icon">☀️</div>
+    <div class="install-prompt-text">
+      <h3>Add to Home Screen</h3>
+      <p>Install the Solar Energy Monitor for quick access — works like a native app, no app store needed.</p>
+    </div>
+  </div>
+  <div class="install-prompt-actions">
+    <button class="install-btn install-btn-primary" id="installBtn">⚡ Install App</button>
+    <button class="install-btn install-btn-secondary" id="dismissBtn">Not now</button>
+  </div>
+  <div class="ios-install-hint" id="iosHint">
+    Tap <strong>⎋ Share</strong> then <strong>"Add to Home Screen"</strong> to install
+  </div>
+</div>
 
 <!-- HEADER -->
 <div class="header">
@@ -1754,6 +1822,72 @@ async function init() {
 }
 
 init();
+
+// ============================================================
+// SERVICE WORKER REGISTRATION (required for PWA installability)
+// ============================================================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+// ============================================================
+// PWA INSTALL PROMPT
+// ============================================================
+(function() {
+  const DISMISS_KEY = 'pwa_install_dismissed';
+  const dismissed = localStorage.getItem(DISMISS_KEY);
+  if (dismissed && Date.now() - parseInt(dismissed) < 7 * 24 * 60 * 60 * 1000) return;
+
+  const prompt = document.getElementById('installPrompt');
+  const installBtn = document.getElementById('installBtn');
+  const dismissBtn = document.getElementById('dismissBtn');
+  const iosHint = document.getElementById('iosHint');
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+                          || window.navigator.standalone === true;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+
+  // Don't show if already installed or on desktop
+  if (isInStandaloneMode || !isMobile) return;
+
+  let deferredPrompt = null;
+
+  if (isIOS && isSafari) {
+    // iOS Safari: show share instructions after 3 seconds
+    iosHint.style.display = 'block';
+    installBtn.style.display = 'none';
+    setTimeout(() => prompt.classList.add('visible'), 3000);
+  } else {
+    // Android Chrome: wait for beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Show after short delay so it doesn't feel jarring
+      setTimeout(() => prompt.classList.add('visible'), 2000);
+    });
+  }
+
+  installBtn.addEventListener('click', async () => {
+    prompt.classList.remove('visible');
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('PWA install outcome:', outcome);
+      deferredPrompt = null;
+    }
+  });
+
+  dismissBtn.addEventListener('click', () => {
+    prompt.classList.remove('visible');
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+  });
+})();
 </script>
 </body>
 </html>
