@@ -804,24 +804,45 @@ function toggleSeries(key) {
 // ============================================================
 // SLIDER
 // ============================================================
+let sliderInitialised = false;
+
 function initSlider() {
   const rs = document.getElementById('rangeStart');
   const re = document.getElementById('rangeEnd');
+  const maxIdx = DATA.length - 1;
+  rs.max = maxIdx;
+  re.max = maxIdx;
+  rs.value = 0;
+  re.value = maxIdx;
+
   function update() {
     let s = parseInt(rs.value), e = parseInt(re.value);
     if (s > e) { if (this === rs) rs.value = e; else re.value = s; s = parseInt(rs.value); e = parseInt(re.value); }
     startIdx = s; endIdx = e;
     document.getElementById('tStart').textContent = idxToTime(s);
     document.getElementById('tEnd').textContent = e >= DATA.length - 1 ? '24:00' : idxToTime(e);
-    const pct1 = s / 288 * 100, pct2 = e / 288 * 100;
+    const pct1 = s / maxIdx * 100, pct2 = e / maxIdx * 100;
     const fill = document.getElementById('sliderFill');
     fill.style.left = pct1 + '%';
     fill.style.width = (pct2 - pct1) + '%';
     updateAllCharts();
   }
-  rs.addEventListener('input', update);
-  re.addEventListener('input', update);
-  update.call(rs);
+
+  // Remove old listeners by cloning the elements
+  if (sliderInitialised) {
+    const newRs = rs.cloneNode(true);
+    const newRe = re.cloneNode(true);
+    rs.parentNode.replaceChild(newRs, rs);
+    re.parentNode.replaceChild(newRe, re);
+    newRs.addEventListener('input', update);
+    newRe.addEventListener('input', update);
+  } else {
+    rs.addEventListener('input', update);
+    re.addEventListener('input', update);
+    sliderInitialised = true;
+  }
+
+  update.call(document.getElementById('rangeStart'));
 }
 
 // ============================================================
