@@ -191,9 +191,51 @@ for rec in raw_records:
     rows.append(normalise(rec, time_str))
 
 rows.sort(key=lambda r: r["time"])
-print(f"  ✓ Normalised {len(rows)} rows")
+print(f"  ✓ Normalised {len(rows)} rows from history")
 if rows:
-    print(f"  Sample: {json.dumps(rows[0])}")
+    print(f"  Last history record: {rows[-1]['time']}")
+
+# ── Step 5b: Fetch station/latest to fill gap between history lag and now ─────
+# The station/history endpoint often lags 4-8 hours behind real time.
+# station/latest returns the most recent reading — we append it if it's
+# more recent than the last history record.
+try:
+    print(f"  Fetching station/latest to fill gap...")
+    latest_resp = post("station/latest", {"stationId": int(station_id)}, token=token)
+    latest_block = latest_resp.get("data", latest_resp)
+
+    # station/latest may return a single object or a list
+    latest_items = []
+    if isinstance(latest_block, list):
+        latest_items = latest_block
+    elif isinstance(latest_block, dict):
+        # Could be nested under stationDataItems or similar
+        latest_items = (latest_block.get("stationDataItems") or
+                        latest_block.get("list") or
+                        [latest_block])
+
+    for item in latest_items:
+        t = item.get("timeStamp") or item.get("time") or item.get("collectTime") or ""
+        if t and (isinstance(t, (int, float)) or (isinstance(t, str) and t.replace('.','').isdigit())):
+            time_str = unix_to_timestr(t)
+        else:
+            time_str = str(t).replace("T", " ")[:19]
+
+        # Only append if this record is more recent than the last history record
+        if not rows or time_str > rows[-1]["time"]:
+            rows.append(normalise(item, time_str))
+            print(f"  ✓ Appended latest record at {time_str}")
+        else:
+            print(f"  ℹ Latest record ({time_str}) already covered by history — skipping")
+
+except Exception as e:
+    print(f"  ⚠ station/latest failed (non-critical): {e}")
+
+rows.sort(key=lambda r: r["time"])
+print(f"  ✓ Total rows after merge: {len(rows)}")
+if rows:
+    print(f"  Sample first: {json.dumps(rows[0])}")
+    print(f"  Sample last:  {json.dumps(rows[-1])}")
 
 # ── Step 6: Write output ──────────────────────────────────────────────────────
 os.makedirs("data", exist_ok=True)
