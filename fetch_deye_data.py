@@ -100,13 +100,7 @@ print(f"  Fetching data for {target_date} (station {station_id})...")
 # ── Step 4: Fetch 5-minute history ───────────────────────────────────────────
 history_resp = None
 attempts = [
-    # granularity=1 = frame-level (5-min intervals), startAt only, format yyyy-MM-dd
-    ("station/history", {
-        "stationId":   int(station_id),
-        "granularity": 1,
-        "startAt":     target_date,
-    }),
-    # fallback: try with endAt as well
+    # granularity=1 = frame-level (5-min intervals), requires both startAt and endAt
     ("station/history", {
         "stationId":   int(station_id),
         "granularity": 1,
@@ -181,9 +175,9 @@ def normalise(r, time_str):
                 out[dk] = val
             except (ValueError, TypeError):
                 pass
-    # production_kw mirrors pv_kw if not set separately
-    if out["production_kw"] == 0.0 and out["pv_kw"] > 0:
-        out["production_kw"] = out["pv_kw"]
+    # Deye API uses generationPower for both production and PV — mirror to pv_kw
+    if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
+        out["pv_kw"] = out["production_kw"]
     return out
 
 rows = []
