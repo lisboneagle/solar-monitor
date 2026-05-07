@@ -164,6 +164,9 @@ def unix_to_timestr(ts):
     except (ValueError, TypeError, OSError):
         return str(ts)
 
+# These fields are always in watts from the Deye API → convert to kW
+WATT_FIELDS = {"production_kw", "consumption_kw", "grid_kw", "battery_kw", "pv_kw", "generator_kw"}
+
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
@@ -172,8 +175,8 @@ def normalise(r, time_str):
         if k in r and r[k] is not None:
             try:
                 val = float(r[k])
-                # Convert W → kW if values look like watts
-                if dk != "soc_pct" and abs(val) > 200:
+                # Always convert W → kW for power fields
+                if dk in WATT_FIELDS:
                     val = round(val / 1000, 3)
                 out[dk] = val
             except (ValueError, TypeError):
