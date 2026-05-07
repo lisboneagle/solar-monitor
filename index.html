@@ -328,8 +328,8 @@
     <span class="upload-icon">⬆️</span>
     <div class="upload-text"><strong>Upload new dataset</strong> — drag & drop or click to browse (.xlsx, .xls, .csv)</div>
   </div>
-  <div class="upload-status idle" id="uploadStatus">Using built-in sample data</div>
-  <div class="upload-hint" id="uploadHint">Expected columns: Time, Production(kW), Consumption(kW), Grid(kW), Battery(kW), SOC(%), PV(kW) — or map custom columns after upload.</div>
+  <div class="upload-status idle" id="uploadStatus">⏳ Checking for latest data…</div>
+  <div class="upload-hint" id="uploadHint">Attempting to auto-load today's data from data/latest.json — or upload a file manually below.</div>
 </div>
 
 <!-- COLUMN MAPPER (shown after upload if columns don't auto-detect) -->
@@ -1112,16 +1112,57 @@ function updateAllCharts() {
 }
 
 // ============================================================
-// INIT
+// INIT — auto-load data/latest.json if available, else use built-in sample
 // ============================================================
-renderKPIs();
-renderSeriesToggle();
-buildMainChart();
-buildSOCChart();
-buildDonutChart();
-buildBarChart();
-renderInsights();
-initSlider();
+async function init() {
+  let loaded = false;
+
+  try {
+    const resp = await fetch("data/latest.json", { cache: "no-store" });
+    if (resp.ok) {
+      const json = await resp.json();
+      const rows = json.rows || json;   // support both {rows:[]} and plain []
+      if (Array.isArray(rows) && rows.length > 0) {
+        rawUploadedRows = rows;
+        // Build a direct identity map (fields already match dashboard schema)
+        const identityMap = {
+          time:           "time",
+          production_kw:  "production_kw",
+          consumption_kw: "consumption_kw",
+          grid_kw:        "grid_kw",
+          battery_kw:     "battery_kw",
+          soc_pct:        "soc_pct",
+          pv_kw:          "pv_kw",
+        };
+        loadDataFromMap(identityMap);
+        const dateLabel = json.date || rows[0]?.time?.slice(0, 10) || "today";
+        setUploadStatus(`✅ Auto-loaded data for ${dateLabel}`, "success");
+        document.getElementById("uploadHint").textContent =
+          `Live data loaded from data/latest.json (${rows.length} readings). Upload a file manually to override.`;
+        loaded = true;
+      }
+    }
+  } catch (e) {
+    // Fetch failed — likely running locally or latest.json doesn't exist yet
+  }
+
+  if (!loaded) {
+    // Fall back to the built-in sample dataset
+    setUploadStatus("Using built-in sample data", "idle");
+    document.getElementById("uploadHint").textContent =
+      "data/latest.json not found — showing sample data. Upload a file or deploy with GitHub Actions to auto-load live data.";
+    renderKPIs();
+    renderSeriesToggle();
+    buildMainChart();
+    buildSOCChart();
+    buildDonutChart();
+    buildBarChart();
+    renderInsights();
+    initSlider();
+  }
+}
+
+init();
 </script>
 </body>
 </html>
