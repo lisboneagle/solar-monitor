@@ -467,9 +467,15 @@
       scroll-snap-type: x mandatory;
       justify-content: flex-start;
       padding-bottom: 8px;
+      width: 100%;
+    }
+    .weather-days-wrapper {
+      width: 100%;
+      overflow: hidden;
     }
     .wx-day {
       scroll-snap-align: start;
+      flex-shrink: 0;
     }
   }
 </style>
