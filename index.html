@@ -35,7 +35,7 @@
     gap: 12px;
   }
   .header-left h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
-  .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 2px; }
+  .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 2px; max-width: fit-content; }
   .header-centre {
     display: flex;
     justify-content: center;
@@ -237,23 +237,23 @@
   .upload-banner {
     background: linear-gradient(135deg, #0F2744 0%, #1E293B 100%);
     border-bottom: 1px solid var(--border);
-    padding: 12px 28px 14px;
+    padding: 14px 28px;
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 300px 1fr;
     gap: 0 20px;
     align-items: start;
   }
   .upload-banner-left {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     padding-right: 20px;
     border-right: 1px solid var(--border);
   }
   .upload-status-row {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
   }
   .upload-label {
     font-size: 0.72rem;
@@ -298,10 +298,11 @@
   .upload-status.success { color: #34D399; background: rgba(16,185,129,0.12); }
   .upload-status.error { color: #F87171; background: rgba(239,68,68,0.12); }
   .upload-hint {
-    font-size: 0.72rem;
-    color: #475569;
+    font-size: 0.76rem;
+    color: #64748B;
     white-space: normal;
-    line-height: 1.4;
+    line-height: 1.5;
+    text-align: justify;
   }
 
   /* WEATHER PANEL */
@@ -324,7 +325,7 @@
   }
   .weather-label-group { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
   .weather-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
-  .weather-location { font-size: 0.68rem; color: #475569; }
+  .weather-location { font-size: 0.68rem; color: #F1F5F9; font-weight: 500; }
   .weather-tabs { display: flex; gap: 4px; }
   .wx-tab {
     background: transparent;
@@ -348,11 +349,20 @@
   .wx-day {
     flex-shrink: 0;
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 8px 6px;
     text-align: center;
-    min-width: 74px;
-    transition: all 0.2s;
+    width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+    height: 118px;
+    min-height: 118px;
+    transition: background 0.2s, border-color 0.2s;
     border: 1px solid transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
   }
   /* per-tab card colour themes */
   .wx-day.theme-overview  { background: rgba(255,255,255,0.04); border-color: var(--border); }
@@ -365,11 +375,21 @@
   .wx-day.today.theme-cloud    { border-color: #6366F1; background: rgba(99,102,241,0.18); }
   .wx-day.today.theme-uv       { border-color: #EF4444; background: rgba(239,68,68,0.18); }
   .wx-day-label { font-size: 0.62rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
-  .wx-day-date  { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
-  .wx-icon  { font-size: 1.4rem; margin: 2px 0; }
+  .wx-day-date  { font-size: 0.68rem; color: var(--muted); }
+  .wx-icon  { font-size: 1.4rem; line-height: 1; }
   .wx-temp  { font-size: 0.82rem; font-weight: 700; color: var(--text); }
   .wx-temp-low { font-size: 0.72rem; color: var(--muted); }
-  .wx-detail { font-size: 0.68rem; margin-top: 3px; font-weight: 600; }
+  .wx-detail {
+    font-size: 0.62rem;
+    margin-top: 0;
+    font-weight: 600;
+    line-height: 1.2;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+  }
   .wx-loading { font-size: 0.78rem; color: var(--muted); padding: 8px 0; }
 
   .col-map-row {
@@ -438,9 +458,9 @@
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-left">
-    <h1>☀️ Solar Energy Monitor</h1>
-    <p id="headerSubtitle">4 May 2026 &nbsp;·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</p>
+  <div class="header-left" style="display:flex;flex-direction:column;align-items:flex-start">
+    <h1 style="width:100%">☀️ Solar Energy Monitor</h1>
+    <p id="headerSubtitle" style="width:100%;text-align:left">4 May 2026 &nbsp;·&nbsp; 5-Minute Interval Data &nbsp;·&nbsp; 289 Readings</p>
   </div>
   <div class="header-centre">
     <div class="status-badge green" id="statusBadge">🟢 System Online</div>
@@ -1562,24 +1582,18 @@ function renderWeather() {
       detail = hint.text;
       detailColor = hint.color;
     } else if (wxTab === 'precip') {
-      const bar = precip === 0 ? '○○○○○' :
-                  precip < 2  ? '●○○○○' :
-                  precip < 5  ? '●●○○○' :
-                  precip < 10 ? '●●●○○' :
-                  precip < 20 ? '●●●●○' : '●●●●●';
-      detail = `💧 ${precip.toFixed(1)}mm ${bar}`;
-      detailColor = precip > 15 ? '#60A5FA' : precip > 5 ? '#7DD3FC' : precip > 0 ? '#BAE6FD' : '#475569';
+      const level = precip === 0 ? 0 : precip < 2 ? 1 : precip < 5 ? 2 : precip < 10 ? 3 : precip < 20 ? 4 : 5;
+      const bar = '\u25AA'.repeat(level) + '\u25AB'.repeat(5 - level);
+      detail = `${precip.toFixed(1)}mm ${bar}`;
+      detailColor = precip > 15 ? '#38BDF8' : precip > 5 ? '#7DD3FC' : precip > 0 ? '#BAE6FD' : '#475569';
     } else if (wxTab === 'cloud') {
-      const bar = cloud < 10 ? '○○○○○' :
-                  cloud < 30 ? '●○○○○' :
-                  cloud < 50 ? '●●○○○' :
-                  cloud < 70 ? '●●●○○' :
-                  cloud < 90 ? '●●●●○' : '●●●●●';
+      const level = cloud < 10 ? 0 : cloud < 30 ? 1 : cloud < 50 ? 2 : cloud < 70 ? 3 : cloud < 90 ? 4 : 5;
+      const bar = '\u25AA'.repeat(level) + '\u25AB'.repeat(5 - level);
       detail = `${bar} ${cloud}%`;
       detailColor = cloud > 70 ? '#818CF8' : cloud > 40 ? '#A5B4FC' : '#C7D2FE';
     } else if (wxTab === 'uv') {
-      const uvLabel = uv < 3 ? 'Low' : uv < 6 ? 'Moderate' : uv < 8 ? 'High' : uv < 11 ? 'V.High' : 'Extreme';
-      detail = `🔆 ${uv.toFixed(1)} ${uvLabel}`;
+      const uvLabel = uv < 3 ? 'Low' : uv < 6 ? 'Mod' : uv < 8 ? 'High' : uv < 11 ? 'V.Hi' : 'Ext';
+      detail = `UV ${uv.toFixed(1)} ${uvLabel}`;
       detailColor = uv >= 11 ? '#EF4444' : uv >= 8 ? '#F97316' : uv >= 6 ? '#F59E0B' : uv >= 3 ? '#84CC16' : '#10B981';
     }
 
