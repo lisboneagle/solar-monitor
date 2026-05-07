@@ -311,18 +311,17 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-end;
   }
   .weather-top {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    gap: 10px;
+    align-items: flex-end;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+    gap: 12px;
     flex-wrap: nowrap;
-    width: 100%;
   }
-  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+  .weather-label-group { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 596px; }
   .weather-label { font-size: 0.9rem; color: #F1F5F9; font-weight: 700; letter-spacing: 0.3px; }
   .weather-location { font-size: 0.68rem; color: #F1F5F9; font-weight: 500; }
   .weather-tabs { display: flex; gap: 4px; }
@@ -346,19 +345,18 @@
     display: flex;
     gap: 6px;
     padding-bottom: 4px;
-    justify-content: space-between;
-    width: 100%;
+    justify-content: flex-end;
+    width: auto;
     overflow-x: visible;
   }
   .weather-days::-webkit-scrollbar { height: 3px; }
   .weather-days::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .wx-day {
-    flex: 1;
+    flex-shrink: 0;
     border-radius: 8px;
     padding: 8px 6px;
     text-align: center;
-    min-width: 70px;
-    max-width: 100px;
+    width: 80px;
     height: 118px;
     min-height: 118px;
     transition: background 0.2s, border-color 0.2s;
@@ -615,6 +613,21 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px" id="billingKpis"></div>
     <div style="background:#0F172A;border-radius:8px;padding:14px 16px" id="billingBreakdown"></div>
+  </div>
+
+  <!-- SOURCES FOOTER -->
+  <div style="margin-top:24px;padding:14px 20px;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:0.72rem;color:#475569;line-height:1.8">
+    <span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:0.68rem">📎 Data Sources &amp; Acknowledgements</span>
+    <span style="margin:0 10px;color:var(--border)">|</span>
+    🌤 <strong style="color:#64748B">Weather Forecast:</strong> <a href="https://open-meteo.com" target="_blank" style="color:#3B82F6;text-decoration:none">Open-Meteo</a> — free open-source weather API, forecast data from ECMWF &amp; GFS models
+    <span style="margin:0 10px;color:var(--border)">|</span>
+    📍 <strong style="color:#64748B">Geocoding:</strong> <a href="https://nominatim.openstreetmap.org" target="_blank" style="color:#3B82F6;text-decoration:none">Nominatim / OpenStreetMap</a> — reverse geocoding for location name
+    <span style="margin:0 10px;color:var(--border)">|</span>
+    ⚡ <strong style="color:#64748B">Inverter Data:</strong> <a href="https://developer.deyecloud.com" target="_blank" style="color:#3B82F6;text-decoration:none">Deye Cloud API</a> — 5-minute interval solar inverter telemetry
+    <span style="margin:0 10px;color:var(--border)">|</span>
+    📊 <strong style="color:#64748B">Charts:</strong> <a href="https://www.chartjs.org" target="_blank" style="color:#3B82F6;text-decoration:none">Chart.js</a>
+    <span style="margin:0 10px;color:var(--border)">|</span>
+    💡 <strong style="color:#64748B">Tariff:</strong> Emfuleni Local Municipality tiered rates — VAT incl — verify against current schedule
   </div>
 
 </div>
@@ -1514,6 +1527,9 @@ async function loadMonthlyBilling() {
       projected cost <strong style="color:#14B8A6">${formatRand(projCostCents)}</strong> ·
       projected saving <strong style="color:#A78BFA">${formatRand(projSavingsCents)}</strong> ·
       VAT incl · ${seasonLabel} rates
+    </div>
+    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #1E293B;font-size:0.68rem;color:#334155">
+      Savings are estimated by comparing actual grid import cost against the cost if all consumption were sourced from the grid at the applicable tiered tariff. Projections assume remaining days mirror the recorded daily average. Values are indicative only.
     </div>`;
 
   document.getElementById('billingStatus').textContent =
