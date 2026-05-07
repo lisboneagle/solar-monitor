@@ -100,21 +100,18 @@ print(f"  Fetching data for {target_date} (station {station_id})...")
 # ── Step 4: Fetch 5-minute history ───────────────────────────────────────────
 history_resp = None
 attempts = [
+    # granularity=1 = frame-level (5-min intervals), startAt only, format yyyy-MM-dd
     ("station/history", {
-        "stationId": station_id,
-        "startTime": f"{target_date} 00:00:00",
-        "endTime":   f"{target_date} 23:59:59",
-        "timeType":  1,
+        "stationId":   int(station_id),
+        "granularity": 1,
+        "startAt":     target_date,
     }),
-    ("station/day", {
-        "stationId": station_id,
-        "time": target_date,
-    }),
-    ("device/history", {
-        "stationId": station_id,
-        "startTime": f"{target_date} 00:00:00",
-        "endTime":   f"{target_date} 23:59:59",
-        "timeType":  1,
+    # fallback: try with endAt as well
+    ("station/history", {
+        "stationId":   int(station_id),
+        "granularity": 1,
+        "startAt":     target_date,
+        "endAt":       target_date,
     }),
 ]
 
