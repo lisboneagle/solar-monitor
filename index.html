@@ -625,6 +625,31 @@
   <!-- KPI CARDS -->
   <div class="kpi-grid" id="kpiGrid"></div>
 
+  <!-- PERIOD FILTER -->
+  <div class="controls" style="margin-bottom:10px;padding:10px 20px">
+    <div class="ctrl-group">
+      <div class="ctrl-label">View Period</div>
+      <div class="ctrl-row">
+        <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')">Day</button>
+        <button class="toggle-btn"        id="pWeek"  onclick="setPeriod('week')">Week</button>
+        <button class="toggle-btn"        id="pMonth" onclick="setPeriod('month')">Month</button>
+        <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')">Year</button>
+      </div>
+    </div>
+    <div class="ctrl-group">
+      <div class="ctrl-label">Navigate</div>
+      <div class="ctrl-row">
+        <button class="toggle-btn" onclick="shiftPeriod(-1)">◀ Prev</button>
+        <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:120px;text-align:center">Today</span>
+        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)">Next ▶</button>
+        <button class="toggle-btn" onclick="resetPeriod()" style="margin-left:4px">↺ Reset</button>
+      </div>
+    </div>
+    <div class="ctrl-group" id="periodNote">
+      <div class="ctrl-label" style="color:#475569;font-size:0.68rem" id="periodNoteText">Showing today's 5-min data</div>
+    </div>
+  </div>
+
   <!-- CONTROLS -->
   <div class="controls">
     <div class="ctrl-group">
@@ -998,8 +1023,331 @@ function darkChartDefaults() {
 }
 
 // ============================================================
-// STATUS BADGE
+// PERIOD FILTER — Day / Week / Month / Year
 // ============================================================
+let currentPeriod = 'day';
+let periodOffset  = 0;      // 0 = current, -1 = previous, etc.
+let periodData    = null;   // aggregated dataset for current period (null = use today's DATA)
+let periodLoading = false;
+
+const PERIOD_LABELS = { day: 'Day', week: 'Week', month: 'Month', year: 'Year' };
+
+function setPeriod(p) {
+  currentPeriod = p;
+  periodOffset  = 0;
+  ['Day','Week','Month','Year'].forEach(x =>
+    document.getElementById('p' + x).classList.toggle('active', x.toLowerCase() === p)
+  );
+  loadPeriodData();
+}
+
+function shiftPeriod(dir) {
+  periodOffset += dir;
+  // Don't go into the future
+  if (periodOffset > 0) { periodOffset = 0; return; }
+  document.getElementById('btnNext').classList.toggle('active', periodOffset === 0);
+  loadPeriodData();
+}
+
+function resetPeriod() {
+  currentPeriod = 'day';
+  periodOffset  = 0;
+  ['Day','Week','Month','Year'].forEach(x =>
+    document.getElementById('p' + x).classList.toggle('active', x === 'Day')
+  );
+  document.getElementById('btnNext').classList.remove('active');
+  loadPeriodData();
+}
+
+function getPeriodDateRange() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (currentPeriod === 'day') {
+    const d = new Date(today);
+    d.setDate(d.getDate() + periodOffset);
+    return { start: d, end: d, label: periodOffset === 0 ? 'Today' :
+      periodOffset === -1 ? 'Yesterday' :
+      d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) };
+  }
+
+  if (currentPeriod === 'week') {
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + periodOffset * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const label = periodOffset === 0 ? 'This Week' :
+      periodOffset === -1 ? 'Last Week' :
+      `${monday.toLocaleDateString('en-ZA', {day:'numeric',month:'short'})} – ${sunday.toLocaleDateString('en-ZA', {day:'numeric',month:'short'})}`;
+    return { start: monday, end: sunday, label };
+  }
+
+  if (currentPeriod === 'month') {
+    const d = new Date(today.getFullYear(), today.getMonth() + periodOffset, 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const label = periodOffset === 0 ? 'This Month' :
+      periodOffset === -1 ? 'Last Month' :
+      d.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
+    return { start: d, end: end, label };
+  }
+
+  if (currentPeriod === 'year') {
+    const yr = today.getFullYear() + periodOffset;
+    return {
+      start: new Date(yr, 0, 1),
+      end:   new Date(yr, 11, 31),
+      label: periodOffset === 0 ? `This Year (${yr})` : String(yr)
+    };
+  }
+}
+
+function dateToKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getDatesInRange(start, end) {
+  const dates = [];
+  const cur = new Date(start);
+  while (cur <= end) { dates.push(dateToKey(cur)); cur.setDate(cur.getDate() + 1); }
+  return dates;
+}
+
+async function loadPeriodData() {
+  if (periodLoading) return;
+  periodLoading = true;
+
+  const range = getPeriodDateRange();
+  const todayKey = dateToKey(new Date());
+  document.getElementById('periodLabel').textContent = range.label;
+
+  // Day view — use current DATA if today, else load archive
+  if (currentPeriod === 'day') {
+    const dayKey = dateToKey(range.start);
+    document.getElementById('periodNoteText').textContent = '5-minute interval data';
+
+    if (dayKey === todayKey) {
+      // Already in DATA from auto-load
+      periodData = null;
+      rebuildChartsFromPeriod();
+    } else {
+      try {
+        const resp = await fetch(`data/${dayKey}.json`, { cache: 'no-store' });
+        if (resp.ok) {
+          const json = await resp.json();
+          periodData = { type: 'raw', rows: json.rows || [], date: dayKey };
+        } else {
+          periodData = { type: 'raw', rows: [], date: dayKey };
+        }
+      } catch(e) { periodData = { type: 'raw', rows: [], date: dayKey }; }
+      rebuildChartsFromPeriod();
+    }
+    periodLoading = false;
+    return;
+  }
+
+  // Week / Month / Year — aggregate daily files into hourly/daily buckets
+  const dates = getDatesInRange(range.start, range.end);
+  document.getElementById('periodNoteText').textContent =
+    `Aggregated from ${dates.length} day${dates.length !== 1 ? 's' : ''} · avg per ${currentPeriod === 'year' ? 'month' : 'day'}`;
+
+  const fetches = dates.map(dk =>
+    fetch(`data/${dk}.json`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null)
+  );
+  const results = await Promise.all(fetches);
+
+  // Build aggregated dataset — one point per day (week/month) or per month (year)
+  const buckets = {};
+
+  results.forEach((json, i) => {
+    if (!json || !json.rows || json.rows.length === 0) return;
+    const dk = dates[i];
+    const bucketKey = currentPeriod === 'year'
+      ? dk.slice(0, 7)   // YYYY-MM
+      : dk;              // YYYY-MM-DD
+
+    if (!buckets[bucketKey]) {
+      buckets[bucketKey] = {
+        label:          currentPeriod === 'year'
+          ? new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })
+          : new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }),
+        production_kwh: 0, consumption_kwh: 0, grid_kwh: 0,
+        battery_dis_kwh: 0, battery_chg_kwh: 0, pv_kwh: 0,
+        soc_end: 0, soc_count: 0, days: 0,
+      };
+    }
+    const b = buckets[bucketKey];
+    b.production_kwh  += json.rows.reduce((s, r) => s + (r.production_kw  || 0) * (5/60), 0);
+    b.consumption_kwh += json.rows.reduce((s, r) => s + (r.consumption_kw || 0) * (5/60), 0);
+    b.grid_kwh        += json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
+    b.pv_kwh          += json.rows.reduce((s, r) => s + (r.pv_kw || 0) * (5/60), 0);
+    b.battery_dis_kwh += json.rows.reduce((s, r) => s + (r.battery_kw > 0 ? r.battery_kw * (5/60) : 0), 0);
+    b.battery_chg_kwh += json.rows.reduce((s, r) => s + (r.battery_kw < 0 ? Math.abs(r.battery_kw) * (5/60) : 0), 0);
+    const lastRow = json.rows[json.rows.length - 1];
+    if (lastRow) { b.soc_end += lastRow.soc_pct || 0; b.soc_count++; }
+    b.days++;
+  });
+
+  periodData = { type: 'aggregated', buckets, period: currentPeriod, range };
+  rebuildChartsFromPeriod();
+  periodLoading = false;
+}
+
+function rebuildChartsFromPeriod() {
+  // Destroy existing charts
+  [mainChart, socChart, donutChart, barChart].forEach(c => { if (c) c.destroy(); });
+  mainChart = null; socChart = null; donutChart = null; barChart = null;
+
+  if (!periodData || periodData.type === 'raw') {
+    // Use raw DATA (today or a specific day)
+    const source = (periodData && periodData.rows.length > 0) ? periodData.rows : DATA;
+    // Swap DATA temporarily if viewing another day
+    if (periodData && periodData.rows.length > 0) {
+      DATA.length = 0;
+      periodData.rows.forEach(r => DATA.push(r));
+    }
+    startIdx = 0; endIdx = DATA.length - 1;
+    renderSeriesToggle();
+    buildMainChart();
+    buildSOCChart();
+    buildDonutChart();
+    buildBarChart();
+    renderInsights();
+    initSlider();
+    renderKPIs();
+    updateStatusBadge();
+  } else {
+    // Aggregated view — build special multi-day charts
+    buildAggregatedCharts(periodData);
+    // Hide slider — not applicable for aggregated views
+    document.getElementById('rangeStart').parentElement.parentElement.parentElement.style.display = 'none';
+    renderAggregatedKPIs(periodData);
+    renderInsights();
+  }
+
+  // Show/hide slider control group
+  const sliderGroup = document.querySelector('.controls .ctrl-group');
+  if (sliderGroup) sliderGroup.style.display = (!periodData || periodData.type === 'raw') ? '' : 'none';
+}
+
+function buildAggregatedCharts(pd) {
+  const bucketKeys = Object.keys(pd.buckets).sort();
+  const buckets    = bucketKeys.map(k => pd.buckets[k]);
+  const labels     = buckets.map(b => b.label);
+  const cfg        = darkChartDefaults();
+
+  // Main chart — daily energy bars
+  const mainCtx = document.getElementById('mainChart').getContext('2d');
+  mainChart = new Chart(mainCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Production',   data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
+        { label: 'Consumption',  data: buckets.map(b => +b.consumption_kwh.toFixed(2)), backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
+        { label: 'Grid Import',  data: buckets.map(b => +b.grid_kwh.toFixed(2)),        backgroundColor: '#EF444499', borderColor: '#EF4444', borderWidth: 1 },
+        { label: 'Bat Discharge',data: buckets.map(b => +b.battery_dis_kwh.toFixed(2)), backgroundColor: '#8B5CF699', borderColor: '#8B5CF6', borderWidth: 1 },
+      ]
+    },
+    options: {
+      ...cfg,
+      plugins: { ...cfg.plugins,
+        tooltip: { ...cfg.plugins.tooltip, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)} kWh` } }
+      },
+      scales: { ...cfg.scales, y: { ...cfg.scales.y, title: { display: true, text: 'Energy (kWh)', color: '#94A3B8' } } }
+    }
+  });
+
+  // SOC chart — end-of-day SOC line
+  const socCtx = document.getElementById('socChart').getContext('2d');
+  socChart = new Chart(socCtx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'End-of-Day SOC (%)',
+        data: buckets.map(b => b.soc_count > 0 ? +(b.soc_end / b.soc_count).toFixed(1) : null),
+        borderColor: '#10B981', backgroundColor: '#10B98133',
+        fill: true, tension: 0.4, borderWidth: 2, pointRadius: 4,
+      }]
+    },
+    options: { ...cfg,
+      scales: { ...cfg.scales, y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'SOC (%)', color: '#94A3B8' } } }
+    }
+  });
+
+  // Donut — totals for period
+  const totalPV   = buckets.reduce((s, b) => s + b.pv_kwh, 0);
+  const totalBat  = buckets.reduce((s, b) => s + b.battery_dis_kwh, 0);
+  const totalGrid = buckets.reduce((s, b) => s + b.grid_kwh, 0);
+  const donutCtx  = document.getElementById('donutChart').getContext('2d');
+  donutChart = new Chart(donutCtx, {
+    type: 'doughnut',
+    data: {
+      labels: [`PV (${totalPV.toFixed(1)} kWh)`, `Battery Discharge (${totalBat.toFixed(1)} kWh)`, `Grid Import (${totalGrid.toFixed(1)} kWh)`],
+      datasets: [{ data: [totalPV, totalBat, totalGrid], backgroundColor: ['#F97316','#8B5CF6','#EF4444'], borderColor: '#1E293B', borderWidth: 3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8', font: { size: 10 } } },
+        tooltip: { backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 1,
+          callbacks: { label: c => ` ${c.label}: ${(c.parsed / (totalPV+totalBat+totalGrid) * 100).toFixed(1)}%` } }
+      }
+    }
+  });
+
+  // Bar chart — production vs consumption per bucket
+  const barCtx = document.getElementById('barChart').getContext('2d');
+  barChart = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Production',  data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
+        { label: 'Consumption', data: buckets.map(b => +b.consumption_kwh.toFixed(2)), backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
+      ]
+    },
+    options: { ...cfg, scales: { ...cfg.scales, y: { ...cfg.scales.y, title: { display: true, text: 'kWh', color: '#94A3B8' } } } }
+  });
+}
+
+function renderAggregatedKPIs(pd) {
+  const buckets   = Object.values(pd.buckets);
+  const totalPV   = buckets.reduce((s, b) => s + b.pv_kwh, 0);
+  const totalCons = buckets.reduce((s, b) => s + b.consumption_kwh, 0);
+  const totalGrid = buckets.reduce((s, b) => s + b.grid_kwh, 0);
+  const daysCount = buckets.reduce((s, b) => s + b.days, 0);
+  const avgSOC    = buckets.filter(b => b.soc_count > 0).reduce((s, b) => s + b.soc_end / b.soc_count, 0) / (buckets.filter(b => b.soc_count > 0).length || 1);
+  const gridIndep = totalCons > 0 ? (1 - totalGrid / totalCons) * 100 : 0;
+
+  // Cost estimate
+  const now       = new Date();
+  const month     = now.getMonth() + 1;
+  const tiers     = getTiers(month);
+  const costCents = calcTieredCost(totalGrid, tiers);
+  const noSolarCostCents = calcTieredCost(totalCons, tiers);
+  const savingsCents = Math.max(0, noSolarCostCents - costCents);
+
+  const cards = [
+    { icon: '⚡', label: 'Total PV Energy',    value: totalPV.toFixed(1),   unit: 'kWh', sub: `${daysCount} days`,         accent: '#F97316' },
+    { icon: '🏠', label: 'Total Consumption',  value: totalCons.toFixed(1), unit: 'kWh', sub: 'total home load',            accent: '#3B82F6' },
+    { icon: '🔌', label: 'Total Grid Import',  value: totalGrid.toFixed(1), unit: 'kWh', sub: 'imported from grid',         accent: '#EF4444' },
+    { icon: '🔋', label: 'Avg End SOC',         value: avgSOC.toFixed(0),    unit: '%',   sub: 'avg end-of-day',             accent: '#10B981' },
+    { icon: '🌐', label: 'Grid Independence',  value: gridIndep.toFixed(1), unit: '%',   sub: 'solar + battery share',       accent: '#14B8A6' },
+    { icon: '💰', label: 'Grid Cost',           value: formatRand(costCents),unit: '',    sub: 'at current tariff',          accent: '#F59E0B' },
+    { icon: '💚', label: 'Savings vs Grid',     value: formatRand(savingsCents), unit: '',sub: 'vs all-grid equivalent',    accent: '#34D399' },
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = cards.map(c => `
+    <div class="kpi-card" style="--accent:${c.accent}">
+      <div class="kpi-icon">${c.icon}</div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}<span style="font-size:0.9rem;margin-left:2px;font-weight:500">${c.unit}</span></div>
+      <div class="kpi-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+
 function updateStatusBadge() {
   const last = DATA[DATA.length - 1];
   const currentSOC = last.soc_pct;
@@ -1368,6 +1716,14 @@ function buildBarChart() {
 // INSIGHTS
 // ============================================================
 function renderInsights() {
+  // If viewing an aggregated period (week/month/year) use aggregated insights
+  if (periodData && periodData.type === 'aggregated') {
+    renderAggregatedInsights(periodData);
+    return;
+  }
+
+  // ── Day view: existing 5-minute insights ──────────────────
+  if (!DATA || DATA.length === 0) return;
   const pvRows = DATA.filter(d => d.pv_kw > 0);
   const firstPV = pvRows.length ? fmtTime(pvRows[0].time) : 'N/A';
   const peakPVRow = DATA.reduce((a, d) => d.pv_kw > a.pv_kw ? d : a, DATA[0]);
@@ -1379,10 +1735,12 @@ function renderInsights() {
   const gridIndepIntervals = DATA.filter(d => Math.abs(d.grid_kw) < 0.05).length;
   const totalPV = DATA.reduce((s, d) => s + d.pv_kw * (5/60), 0);
   const totalCons = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
-  const hrsAtAvgLoad = totalPV / avgCons;
+  const totalGrid = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw) * (5/60), 0);
+  const hrsAtAvgLoad = avgCons > 0 ? totalPV / avgCons : 0;
   const nightRows = DATA.filter(d => { const h = parseInt(d.time.slice(11, 13)); return h < 6; });
   const nightBatKwh = nightRows.reduce((s, d) => s + (d.battery_kw > 0 ? d.battery_kw * (5/60) : 0), 0);
   const pctIndep = (gridIndepIntervals / DATA.length * 100).toFixed(1);
+  const gridIndep = totalCons > 0 ? ((1 - totalGrid / totalCons) * 100).toFixed(1) : '0.0';
 
   const insights = [
     `🌞 Solar generation began at <b>${firstPV}</b> and peaked at <b>${peakPVTime}</b> with <b>${peakPVRow.pv_kw.toFixed(2)} kW</b> peak output.`,
@@ -1391,6 +1749,63 @@ function renderInsights() {
     `⚡ The system operated grid-independently for <b>${pctIndep}%</b> of 5-minute intervals (grid draw < 0.05 kW).`,
     `📈 Total solar energy harvested: <b>${totalPV.toFixed(1)} kWh</b> — enough to power the home for <b>${hrsAtAvgLoad.toFixed(1)} hours</b> at average load.`,
     `🌙 During night hours (00:00–06:00), the battery supplied <b>${nightBatKwh.toFixed(2)} kWh</b> to cover home load.`,
+  ];
+  document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
+}
+
+function renderAggregatedInsights(pd) {
+  const buckets    = Object.values(pd.buckets);
+  const daysCount  = buckets.reduce((s, b) => s + b.days, 0);
+  const period     = pd.period;
+  const label      = pd.range?.label || period;
+
+  if (buckets.length === 0) {
+    document.getElementById('insightsPanel').innerHTML =
+      `<div class="insight-item">No data available for this period yet.</div>`;
+    return;
+  }
+
+  const totalPV       = buckets.reduce((s, b) => s + b.pv_kwh, 0);
+  const totalCons     = buckets.reduce((s, b) => s + b.consumption_kwh, 0);
+  const totalGrid     = buckets.reduce((s, b) => s + b.grid_kwh, 0);
+  const totalBatDis   = buckets.reduce((s, b) => s + b.battery_dis_kwh, 0);
+  const totalBatChg   = buckets.reduce((s, b) => s + b.battery_chg_kwh, 0);
+  const gridIndep     = totalCons > 0 ? (1 - totalGrid / totalCons) * 100 : 0;
+  const avgDailyPV    = daysCount > 0 ? totalPV / daysCount : 0;
+  const avgDailyCons  = daysCount > 0 ? totalCons / daysCount : 0;
+  const avgDailyGrid  = daysCount > 0 ? totalGrid / daysCount : 0;
+
+  // Best and worst days by PV generation
+  const sortedByPV  = [...buckets].sort((a, b) => b.production_kwh - a.production_kwh);
+  const bestDay     = sortedByPV[0];
+  const worstDay    = sortedByPV[sortedByPV.length - 1];
+
+  // Best and worst by grid independence
+  const sortedByIndep = [...buckets].sort((a, b) => {
+    const ia = a.consumption_kwh > 0 ? (1 - a.grid_kwh / a.consumption_kwh) : 0;
+    const ib = b.consumption_kwh > 0 ? (1 - b.grid_kwh / b.consumption_kwh) : 0;
+    return ib - ia;
+  });
+  const mostIndep  = sortedByIndep[0];
+  const leastIndep = sortedByIndep[sortedByIndep.length - 1];
+  const mostIndepPct  = mostIndep.consumption_kwh > 0  ? ((1 - mostIndep.grid_kwh  / mostIndep.consumption_kwh)  * 100).toFixed(0) : 0;
+  const leastIndepPct = leastIndep.consumption_kwh > 0 ? ((1 - leastIndep.grid_kwh / leastIndep.consumption_kwh) * 100).toFixed(0) : 0;
+
+  // Cost estimate
+  const now    = new Date();
+  const tiers  = getTiers(now.getMonth() + 1);
+  const cost   = calcTieredCost(totalGrid, tiers);
+  const saving = Math.max(0, calcTieredCost(totalCons, tiers) - cost);
+
+  const periodWord = period === 'week' ? 'week' : period === 'month' ? 'month' : 'year';
+
+  const insights = [
+    `☀️ Over <b>${label}</b> (${daysCount} day${daysCount !== 1 ? 's' : ''}), the system generated <b>${totalPV.toFixed(1)} kWh</b> of solar energy — an average of <b>${avgDailyPV.toFixed(1)} kWh/day</b>.`,
+    `🏠 Total home consumption was <b>${totalCons.toFixed(1)} kWh</b> (avg <b>${avgDailyCons.toFixed(1)} kWh/day</b>). Grid drew <b>${totalGrid.toFixed(1)} kWh</b> — avg <b>${avgDailyGrid.toFixed(1)} kWh/day</b>.`,
+    `🌐 Overall grid independence for the ${periodWord}: <b>${gridIndep.toFixed(1)}%</b>. Best ${period === 'year' ? 'month' : 'day'}: <b>${mostIndep.label}</b> at <b>${mostIndepPct}%</b>. Lowest: <b>${leastIndep.label}</b> at <b>${leastIndepPct}%</b>.`,
+    `⚡ Best solar ${period === 'year' ? 'month' : 'day'}: <b>${bestDay.label}</b> with <b>${bestDay.production_kwh.toFixed(1)} kWh</b>. Lowest: <b>${worstDay.label}</b> with <b>${worstDay.production_kwh.toFixed(1)} kWh</b>.`,
+    `🔋 Battery discharged <b>${totalBatDis.toFixed(1)} kWh</b> and charged <b>${totalBatChg.toFixed(1)} kWh</b> across the ${periodWord}.`,
+    `💰 Estimated grid cost for the period: <b>${formatRand(cost)}</b>. Estimated saving vs all-grid: <b>${formatRand(saving)}</b> (VAT incl · ${getTiers(now.getMonth()+1) === TARIFF.summer ? 'Summer' : 'Winter'} rates).`,
   ];
   document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
 }
@@ -1628,6 +2043,15 @@ async function loadMonthlyBilling() {
   document.getElementById('headerCostValue').textContent = formatRand(mtdCostCents);
   document.getElementById('headerCostSub').textContent =
     `${mtdKwh.toFixed(1)} kWh · ${daysWithData} day${daysWithData !== 1 ? 's' : ''} · ${seasonLabel} rates · VAT incl`;
+
+  // Also refresh billing title to reflect current period
+  const range = getPeriodDateRange ? getPeriodDateRange() : null;
+  const billingTitle = document.querySelector('#billingPanel .insights-title');
+  if (billingTitle && range && currentPeriod !== 'day') {
+    billingTitle.textContent = `💰 Grid Cost — ${range.label}`;
+  } else if (billingTitle) {
+    billingTitle.textContent = '💰 Monthly Grid Cost Estimate';
+  }
 }
 
 // ============================================================
@@ -1826,7 +2250,7 @@ init();
 // ============================================================
 // SERVICE WORKER REGISTRATION (required for PWA installability)
 // ============================================================
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => console.log('SW registered:', reg.scope))
