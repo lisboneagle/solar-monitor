@@ -1016,8 +1016,16 @@ function darkChartDefaults() {
       tooltip: { backgroundColor: '#1E293B', borderColor: '#334155', borderWidth: 1, titleColor: '#F1F5F9', bodyColor: '#94A3B8' }
     },
     scales: {
-      x: { grid: { color: '#334155' }, ticks: { color: '#94A3B8', maxTicksLimit: 13, font: { size: 10 } } },
-      y: { grid: { color: '#334155' }, ticks: { color: '#94A3B8', font: { size: 10 } } }
+      x: {
+        grid: { color: '#334155' },
+        ticks: { color: '#94A3B8', maxTicksLimit: 13, font: { size: 10 } },
+        title: { display: true, text: 'Time', color: '#64748B', font: { size: 10, weight: '600' } }
+      },
+      y: {
+        grid: { color: '#334155' },
+        ticks: { color: '#94A3B8', font: { size: 10 } },
+        title: { display: true, text: 'Power (kW)', color: '#64748B', font: { size: 10, weight: '600' } }
+      }
     }
   };
 }
@@ -1255,7 +1263,11 @@ function buildAggregatedCharts(pd) {
       plugins: { ...cfg.plugins,
         tooltip: { ...cfg.plugins.tooltip, callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)} kWh` } }
       },
-      scales: { ...cfg.scales, y: { ...cfg.scales.y, title: { display: true, text: 'Energy (kWh)', color: '#94A3B8' } } }
+      scales: {
+        ...cfg.scales,
+        x: { ...cfg.scales.x, title: { display: true, text: pd.period === 'year' ? 'Month' : 'Date', color: '#64748B', font: { size: 10, weight: '600' } } },
+        y: { ...cfg.scales.y, title: { display: true, text: 'Energy (kWh)', color: '#64748B', font: { size: 10, weight: '600' } } }
+      }
     }
   });
 
@@ -1273,7 +1285,11 @@ function buildAggregatedCharts(pd) {
       }]
     },
     options: { ...cfg,
-      scales: { ...cfg.scales, y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'SOC (%)', color: '#94A3B8' } } }
+      scales: {
+        ...cfg.scales,
+        x: { ...cfg.scales.x, title: { display: true, text: pd.period === 'year' ? 'Month' : 'Date', color: '#64748B', font: { size: 10, weight: '600' } } },
+        y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'State of Charge (%)', color: '#64748B', font: { size: 10, weight: '600' } } }
+      }
     }
   });
 
@@ -1307,7 +1323,13 @@ function buildAggregatedCharts(pd) {
         { label: 'Consumption', data: buckets.map(b => +b.consumption_kwh.toFixed(2)), backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
       ]
     },
-    options: { ...cfg, scales: { ...cfg.scales, y: { ...cfg.scales.y, title: { display: true, text: 'kWh', color: '#94A3B8' } } } }
+    options: { ...cfg,
+      scales: {
+        ...cfg.scales,
+        x: { ...cfg.scales.x, title: { display: true, text: pd.period === 'year' ? 'Month' : 'Date', color: '#64748B', font: { size: 10, weight: '600' } } },
+        y: { ...cfg.scales.y, title: { display: true, text: 'Energy (kWh)', color: '#64748B', font: { size: 10, weight: '600' } } }
+      }
+    }
   });
 }
 
@@ -1615,7 +1637,8 @@ function buildSOCChart() {
       },
       scales: {
         ...cfg.scales,
-        y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'SOC (%)', color: '#94A3B8' } }
+        x: { ...cfg.scales.x, title: { display: true, text: 'Time of Day', color: '#64748B', font: { size: 10, weight: '600' } } },
+        y: { ...cfg.scales.y, min: 0, max: 100, title: { display: true, text: 'State of Charge (%)', color: '#64748B', font: { size: 10, weight: '600' } } }
       }
     }
   });
@@ -1705,8 +1728,8 @@ function buildBarChart() {
       },
       scales: {
         ...cfg.scales,
-        x: { ...cfg.scales.x, stacked: false },
-        y: { ...cfg.scales.y, title: { display: true, text: 'Avg kW', color: '#94A3B8' } }
+        x: { ...cfg.scales.x, stacked: false, title: { display: true, text: 'Hour of Day', color: '#64748B', font: { size: 10, weight: '600' } } },
+        y: { ...cfg.scales.y, title: { display: true, text: 'Avg Power (kW)', color: '#64748B', font: { size: 10, weight: '600' } } }
       }
     }
   });
