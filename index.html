@@ -1120,86 +1120,109 @@ function getDatesInRange(start, end) {
   return dates;
 }
 
+// Preserve today's live data so we can restore it when navigating back
+let todayData = null;
+
 async function loadPeriodData() {
-  if (periodLoading) return;
+  // Always allow — remove the lock that was causing stuck states
   periodLoading = true;
 
-  const range = getPeriodDateRange();
-  const todayKey = dateToKey(new Date());
-  document.getElementById('periodLabel').textContent = range.label;
+  try {
+    const range = getPeriodDateRange();
+    const todayKey = dateToKey(new Date());
+    document.getElementById('periodLabel').textContent = range.label;
 
-  // Day view — use current DATA if today, else load archive
-  if (currentPeriod === 'day') {
-    const dayKey = dateToKey(range.start);
-    document.getElementById('periodNoteText').textContent = '5-minute interval data';
+    // Save today's data on first load so we can restore it later
+    if (todayData === null && DATA.length > 0) {
+      todayData = [...DATA];
+    }
 
-    if (dayKey === todayKey) {
-      // Already in DATA from auto-load
-      periodData = null;
-      rebuildChartsFromPeriod();
-    } else {
-      try {
-        const resp = await fetch(`data/${dayKey}.json`, { cache: 'no-store' });
-        if (resp.ok) {
-          const json = await resp.json();
-          periodData = { type: 'raw', rows: json.rows || [], date: dayKey };
-        } else {
+    // Day view
+    if (currentPeriod === 'day') {
+      const dayKey = dateToKey(range.start);
+      document.getElementById('periodNoteText').textContent = '5-minute interval data';
+
+      if (dayKey === todayKey) {
+        // Restore today's live data if we navigated away
+        if (todayData && todayData.length > 0) {
+          DATA.length = 0;
+          todayData.forEach(r => DATA.push(r));
+        }
+        periodData = null;
+      } else {
+        try {
+          const resp = await fetch(`data/${dayKey}.json`, { cache: 'no-store' });
+          if (resp.ok) {
+            const json = await resp.json();
+            periodData = { type: 'raw', rows: json.rows || [], date: dayKey };
+          } else {
+            periodData = { type: 'raw', rows: [], date: dayKey };
+          }
+        } catch(e) {
           periodData = { type: 'raw', rows: [], date: dayKey };
         }
-      } catch(e) { periodData = { type: 'raw', rows: [], date: dayKey }; }
+        // Load archive rows into DATA
+        if (periodData.rows.length > 0) {
+          DATA.length = 0;
+          periodData.rows.forEach(r => DATA.push(r));
+        } else if (todayData) {
+          DATA.length = 0;
+          todayData.forEach(r => DATA.push(r));
+        }
+      }
       rebuildChartsFromPeriod();
+      periodLoading = false;
+      return;
     }
+
+    // Week / Month / Year — aggregate
+    const dates = getDatesInRange(range.start, range.end);
+    document.getElementById('periodNoteText').textContent =
+      `Aggregated from ${dates.length} day${dates.length !== 1 ? 's' : ''} · per ${currentPeriod === 'year' ? 'month' : 'day'}`;
+
+    const fetches = dates.map(dk =>
+      fetch(`data/${dk}.json`, { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    );
+    const results = await Promise.all(fetches);
+    const buckets = {};
+
+    results.forEach((json, i) => {
+      if (!json || !json.rows || json.rows.length === 0) return;
+      const dk = dates[i];
+      const bucketKey = currentPeriod === 'year' ? dk.slice(0, 7) : dk;
+
+      if (!buckets[bucketKey]) {
+        buckets[bucketKey] = {
+          label: currentPeriod === 'year'
+            ? new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })
+            : new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }),
+          production_kwh: 0, consumption_kwh: 0, grid_kwh: 0,
+          battery_dis_kwh: 0, battery_chg_kwh: 0, pv_kwh: 0,
+          soc_end: 0, soc_count: 0, days: 0,
+        };
+      }
+      const b = buckets[bucketKey];
+      b.production_kwh  += json.rows.reduce((s, r) => s + (r.production_kw  || 0) * (5/60), 0);
+      b.consumption_kwh += json.rows.reduce((s, r) => s + (r.consumption_kw || 0) * (5/60), 0);
+      b.grid_kwh        += json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
+      b.pv_kwh          += json.rows.reduce((s, r) => s + (r.pv_kw || 0) * (5/60), 0);
+      b.battery_dis_kwh += json.rows.reduce((s, r) => s + (r.battery_kw > 0 ? r.battery_kw * (5/60) : 0), 0);
+      b.battery_chg_kwh += json.rows.reduce((s, r) => s + (r.battery_kw < 0 ? Math.abs(r.battery_kw) * (5/60) : 0), 0);
+      const lastRow = json.rows[json.rows.length - 1];
+      if (lastRow) { b.soc_end += lastRow.soc_pct || 0; b.soc_count++; }
+      b.days++;
+    });
+
+    periodData = { type: 'aggregated', buckets, period: currentPeriod, range };
+    rebuildChartsFromPeriod();
+
+  } catch(err) {
+    console.error('loadPeriodData error:', err);
+  } finally {
     periodLoading = false;
-    return;
   }
-
-  // Week / Month / Year — aggregate daily files into hourly/daily buckets
-  const dates = getDatesInRange(range.start, range.end);
-  document.getElementById('periodNoteText').textContent =
-    `Aggregated from ${dates.length} day${dates.length !== 1 ? 's' : ''} · avg per ${currentPeriod === 'year' ? 'month' : 'day'}`;
-
-  const fetches = dates.map(dk =>
-    fetch(`data/${dk}.json`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
-      .catch(() => null)
-  );
-  const results = await Promise.all(fetches);
-
-  // Build aggregated dataset — one point per day (week/month) or per month (year)
-  const buckets = {};
-
-  results.forEach((json, i) => {
-    if (!json || !json.rows || json.rows.length === 0) return;
-    const dk = dates[i];
-    const bucketKey = currentPeriod === 'year'
-      ? dk.slice(0, 7)   // YYYY-MM
-      : dk;              // YYYY-MM-DD
-
-    if (!buckets[bucketKey]) {
-      buckets[bucketKey] = {
-        label:          currentPeriod === 'year'
-          ? new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })
-          : new Date(dk + 'T12:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }),
-        production_kwh: 0, consumption_kwh: 0, grid_kwh: 0,
-        battery_dis_kwh: 0, battery_chg_kwh: 0, pv_kwh: 0,
-        soc_end: 0, soc_count: 0, days: 0,
-      };
-    }
-    const b = buckets[bucketKey];
-    b.production_kwh  += json.rows.reduce((s, r) => s + (r.production_kw  || 0) * (5/60), 0);
-    b.consumption_kwh += json.rows.reduce((s, r) => s + (r.consumption_kw || 0) * (5/60), 0);
-    b.grid_kwh        += json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
-    b.pv_kwh          += json.rows.reduce((s, r) => s + (r.pv_kw || 0) * (5/60), 0);
-    b.battery_dis_kwh += json.rows.reduce((s, r) => s + (r.battery_kw > 0 ? r.battery_kw * (5/60) : 0), 0);
-    b.battery_chg_kwh += json.rows.reduce((s, r) => s + (r.battery_kw < 0 ? Math.abs(r.battery_kw) * (5/60) : 0), 0);
-    const lastRow = json.rows[json.rows.length - 1];
-    if (lastRow) { b.soc_end += lastRow.soc_pct || 0; b.soc_count++; }
-    b.days++;
-  });
-
-  periodData = { type: 'aggregated', buckets, period: currentPeriod, range };
-  rebuildChartsFromPeriod();
-  periodLoading = false;
 }
 
 function rebuildChartsFromPeriod() {
@@ -1207,14 +1230,12 @@ function rebuildChartsFromPeriod() {
   [mainChart, socChart, donutChart, barChart].forEach(c => { if (c) c.destroy(); });
   mainChart = null; socChart = null; donutChart = null; barChart = null;
 
-  if (!periodData || periodData.type === 'raw') {
-    // Use raw DATA (today or a specific day)
-    const source = (periodData && periodData.rows.length > 0) ? periodData.rows : DATA;
-    // Swap DATA temporarily if viewing another day
-    if (periodData && periodData.rows.length > 0) {
-      DATA.length = 0;
-      periodData.rows.forEach(r => DATA.push(r));
-    }
+  // Show/hide slider row using ID rather than fragile DOM traversal
+  const sliderRow = document.getElementById('sliderWrap')?.closest('.ctrl-group');
+  const isRaw = !periodData || periodData.type === 'raw';
+  if (sliderRow) sliderRow.style.display = isRaw ? '' : 'none';
+
+  if (isRaw) {
     startIdx = 0; endIdx = DATA.length - 1;
     renderSeriesToggle();
     buildMainChart();
@@ -1226,17 +1247,10 @@ function rebuildChartsFromPeriod() {
     renderKPIs();
     updateStatusBadge();
   } else {
-    // Aggregated view — build special multi-day charts
     buildAggregatedCharts(periodData);
-    // Hide slider — not applicable for aggregated views
-    document.getElementById('rangeStart').parentElement.parentElement.parentElement.style.display = 'none';
     renderAggregatedKPIs(periodData);
     renderInsights();
   }
-
-  // Show/hide slider control group
-  const sliderGroup = document.querySelector('.controls .ctrl-group');
-  if (sliderGroup) sliderGroup.style.display = (!periodData || periodData.type === 'raw') ? '' : 'none';
 }
 
 function buildAggregatedCharts(pd) {
