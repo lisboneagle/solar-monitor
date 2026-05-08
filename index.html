@@ -1724,9 +1724,11 @@ function renderInsights() {
 
   // ── Day view: existing 5-minute insights ──────────────────
   if (!DATA || DATA.length === 0) return;
-  const pvRows = DATA.filter(d => d.pv_kw > 0);
+  const pvRows = DATA.filter(d => d.pv_kw > 0.01);  // >10W threshold to filter inverter noise
   const firstPV = pvRows.length ? fmtTime(pvRows[0].time) : 'N/A';
-  const peakPVRow = DATA.reduce((a, d) => d.pv_kw > a.pv_kw ? d : a, DATA[0]);
+  const peakPVRow = pvRows.length
+    ? pvRows.reduce((a, d) => d.pv_kw > a.pv_kw ? d : a, pvRows[0])
+    : DATA[0];
   const peakPVTime = fmtTime(peakPVRow.time);
   const minSOC = Math.min(...DATA.map(d => d.soc_pct));
   const maxSOC = Math.max(...DATA.map(d => d.soc_pct));
