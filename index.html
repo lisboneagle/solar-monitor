@@ -1210,9 +1210,21 @@ async function loadPeriodData() {
         if (periodData.rows.length > 0) {
           DATA.length = 0;
           periodData.rows.forEach(r => DATA.push(r));
+          // Update header subtitle to show the selected day's date
+          const d = new Date(dayKey + 'T12:00:00');
+          const prettyDate = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+          document.getElementById('headerSubtitle').innerHTML =
+            `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong>`;
         } else if (todayData) {
           DATA.length = 0;
           todayData.forEach(r => DATA.push(r));
+          // Restore today's date
+          const todayStr = todayData[0]?.time?.slice(0, 10) || '';
+          if (todayStr) {
+            const d = new Date(todayStr + 'T12:00:00');
+            document.getElementById('headerSubtitle').innerHTML =
+              `<strong style="color:#CBD5E1;font-size:1.05rem">${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>`;
+          }
         }
       }
       rebuildChartsFromPeriod();
