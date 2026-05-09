@@ -193,7 +193,7 @@
   }
   .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
   .ctrl-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
-  .ctrl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ctrl-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
   .slider-container { position: relative; width: 220px; height: 24px; }
   .slider-container input[type=range] {
     position: absolute;
@@ -694,19 +694,19 @@
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
-        <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')">Day</button>
-        <button class="toggle-btn"        id="pWeek"  onclick="setPeriod('week')">Week</button>
-        <button class="toggle-btn"        id="pMonth" onclick="setPeriod('month')">Month</button>
-        <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')">Year</button>
+        <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')"   style="flex:1;text-align:center">Day</button>
+        <button class="toggle-btn"        id="pWeek"  onclick="setPeriod('week')"  style="flex:1;text-align:center">Week</button>
+        <button class="toggle-btn"        id="pMonth" onclick="setPeriod('month')" style="flex:1;text-align:center">Month</button>
+        <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')"  style="flex:1;text-align:center">Year</button>
       </div>
     </div>
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">Navigate</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" onclick="shiftPeriod(-1)">◀ Prev</button>
-        <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:120px;text-align:center">Today</span>
-        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)">Next ▶</button>
-        <button class="toggle-btn" onclick="resetPeriod()" style="margin-left:4px">↺ Reset</button>
+        <button class="toggle-btn" onclick="shiftPeriod(-1)" style="flex:1;text-align:center">◀ Prev</button>
+        <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:80px;text-align:center">Today</span>
+        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="flex:1;text-align:center">Next ▶</button>
+        <button class="toggle-btn" onclick="resetPeriod()" style="flex:1;text-align:center">↺ Reset</button>
       </div>
     </div>
     <div class="ctrl-group" id="periodNote">
@@ -735,20 +735,20 @@
     <div class="ctrl-group">
       <div class="ctrl-label">Chart Style</div>
       <div class="ctrl-row">
-        <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')">Line</button>
-        <button class="toggle-btn" id="btnArea" onclick="setChartType('area')">Area</button>
+        <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')" style="flex:1;text-align:center">Line</button>
+        <button class="toggle-btn" id="btnArea" onclick="setChartType('area')" style="flex:1;text-align:center">Area</button>
       </div>
     </div>
     <div class="ctrl-group">
       <div class="ctrl-label">Smoothing</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()">5-pt Rolling Avg</button>
+        <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()" style="flex:1;text-align:center">5-pt Rolling Avg</button>
       </div>
     </div>
     <div class="ctrl-group">
       <div class="ctrl-label">Reset</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" onclick="resetFilters()">Reset All</button>
+        <button class="toggle-btn" onclick="resetFilters()" style="flex:1;text-align:center">Reset All</button>
       </div>
     </div>
   </div>
