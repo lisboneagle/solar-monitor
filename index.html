@@ -1714,24 +1714,32 @@ function buildDonutChart() {
 function buildBarChart() {
   const hourly = {};
   for (let h = 0; h < 24; h++) hourly[h] = { prod: [], cons: [] };
-  DATA.forEach(d => {
+
+  // Use filteredData so it respects the time range slider
+  const fd = filteredData();
+  fd.forEach(d => {
     const h = parseInt(d.time.slice(11, 13));
     hourly[h].prod.push(d.production_kw);
     hourly[h].cons.push(d.consumption_kw);
   });
-  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
-  const prodAvg = hours.map((_, h) => hourly[h].prod.length ? hourly[h].prod.reduce((a, b) => a + b, 0) / hourly[h].prod.length : 0);
-  const consAvg = hours.map((_, h) => hourly[h].cons.length ? hourly[h].cons.reduce((a, b) => a + b, 0) / hourly[h].cons.length : 0);
+
+  // Only include hours that have at least one data point
+  const presentHours = Array.from({ length: 24 }, (_, i) => i)
+    .filter(h => hourly[h].prod.length > 0);
+
+  const labels   = presentHours.map(h => `${String(h).padStart(2,'0')}:00`);
+  const prodAvg  = presentHours.map(h => hourly[h].prod.reduce((a,b) => a+b, 0) / hourly[h].prod.length);
+  const consAvg  = presentHours.map(h => hourly[h].cons.reduce((a,b) => a+b, 0) / hourly[h].cons.length);
 
   const ctx = document.getElementById('barChart').getContext('2d');
   const cfg = darkChartDefaults();
   barChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: hours.map(h => `${h}:00`),
+      labels,
       datasets: [
-        { label: 'Production', data: prodAvg, backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
-        { label: 'Consumption', data: consAvg, backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
+        { label: 'Production',  data: prodAvg, backgroundColor: '#22C55E99', borderColor: '#22C55E', borderWidth: 1 },
+        { label: 'Consumption', data: consAvg, backgroundColor: '#F9731699', borderColor: '#F97316', borderWidth: 1 },
       ]
     },
     options: {
