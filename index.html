@@ -81,35 +81,70 @@
     color: #94A3B8;
     margin-top: 1px;
   }
-  .status-badge {
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    transition: background 0.4s, color 0.4s, border-color 0.4s;
-    cursor: default;
+  /* STATUS GAUGE */
+  .status-gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 220px;
+  }
+  .gauge-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .gauge-track-wrap {
     position: relative;
+    width: 220px;
+    height: 14px;
   }
-  .status-badge[title]:hover::after {
-    content: attr(title);
+  .gauge-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right,
+      #EF4444 0%,
+      #F97316 25%,
+      #F59E0B 45%,
+      #22C55E 65%,
+      #10B981 100%
+    );
+    margin-top: 2px;
+  }
+  .gauge-needle {
     position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    background: #1E293B;
-    border: 1px solid #334155;
-    color: #F1F5F9;
-    font-size: 0.72rem;
-    font-weight: 400;
-    padding: 6px 10px;
-    border-radius: 6px;
-    white-space: nowrap;
-    z-index: 10;
-    pointer-events: none;
+    top: -2px;
+    width: 3px;
+    height: 14px;
+    background: #F1F5F9;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 0 4px rgba(0,0,0,0.6);
   }
-  .status-badge.green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); color: #34D399; }
-  .status-badge.yellow { background: rgba(245,158,11,0.15);  border: 1px solid rgba(245,158,11,0.4);  color: #FCD34D; }
-  .status-badge.red    { background: rgba(239,68,68,0.15);   border: 1px solid rgba(239,68,68,0.4);   color: #F87171; }
-  .status-badge.blue   { background: rgba(59,130,246,0.15);  border: 1px solid rgba(59,130,246,0.4);  color: #93C5FD; }
+  .gauge-needle::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px;
+    height: 7px;
+    background: #F1F5F9;
+    border-radius: 50%;
+  }
+  .gauge-ticks {
+    display: flex;
+    justify-content: space-between;
+    width: 220px;
+    font-size: 0.55rem;
+    color: #475569;
+    margin-top: 1px;
+  }
 
   /* MAIN LAYOUT */
   .main { padding: 20px 24px; max-width: 1600px; margin: 0 auto; }
@@ -563,7 +598,23 @@
     <p id="headerSubtitle" style="width:100%;text-align:left"><strong style="color:#CBD5E1;font-size:1.05rem">4 May 2026</strong></p>
   </div>
   <div class="header-centre">
-    <div class="status-badge green" id="statusBadge">🟢 System Online</div>
+    <div class="status-gauge" id="statusGauge">
+      <div class="gauge-label-row">
+        <span id="gaugeIcon">🟢</span>
+        <span id="gaugeText" style="color:#10B981">System Optimal</span>
+      </div>
+      <div class="gauge-track-wrap">
+        <div class="gauge-track"></div>
+        <div class="gauge-needle" id="gaugeNeedle" style="left:80%"></div>
+      </div>
+      <div class="gauge-ticks">
+        <span>Critical</span>
+        <span>Poor</span>
+        <span>Fair</span>
+        <span>Good</span>
+        <span>Optimal</span>
+      </div>
+    </div>
   </div>
   <div class="header-right">
     <div class="header-cost" id="headerCost">
@@ -1386,39 +1437,39 @@ function renderAggregatedKPIs(pd) {
 
 function updateStatusBadge() {
   const last = DATA[DATA.length - 1];
+  if (!last) return;
   const currentSOC = last.soc_pct;
-  const totalGrid = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw) * (5/60), 0);
-  const totalCons = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
-  const gridPct = totalGrid / totalCons * 100;
+  const totalGrid  = DATA.reduce((s, d) => s + Math.max(0, d.grid_kw) * (5/60), 0);
+  const totalCons  = DATA.reduce((s, d) => s + d.consumption_kw * (5/60), 0);
+  const gridPct    = totalCons > 0 ? totalGrid / totalCons * 100 : 0;
 
-  // Check conditions in priority order
-  const badge = document.getElementById('statusBadge');
+  // Score 0–100: SOC contributes 60%, grid independence 40%
+  const socScore  = Math.min(currentSOC, 100) / 100;
+  const gridScore = Math.max(0, 1 - gridPct / 100);
+  const score     = Math.round(socScore * 60 + gridScore * 40);
 
-  if (currentSOC <= 15) {
-    badge.className = 'status-badge red';
-    badge.textContent = '🔴 Battery Critical';
-    badge.title = `SOC is at ${currentSOC}% — battery critically low`;
-  } else if (currentSOC <= 25) {
-    badge.className = 'status-badge yellow';
-    badge.textContent = '🟡 Battery Low';
-    badge.title = `SOC is at ${currentSOC}% — consider reducing consumption`;
-  } else if (gridPct > 25) {
-    badge.className = 'status-badge red';
-    badge.textContent = '🔴 High Grid Draw';
-    badge.title = `${gridPct.toFixed(1)}% of energy came from the grid today`;
-  } else if (gridPct > 10) {
-    badge.className = 'status-badge yellow';
-    badge.textContent = '🟡 Some Grid Usage';
-    badge.title = `${gridPct.toFixed(1)}% of energy came from the grid today`;
-  } else if (currentSOC >= 95) {
-    badge.className = 'status-badge blue';
-    badge.textContent = '🔵 Battery Full';
-    badge.title = `SOC is at ${currentSOC}% — battery fully charged`;
-  } else {
-    badge.className = 'status-badge green';
-    badge.textContent = '🟢 System Optimal';
-    badge.title = `SOC ${currentSOC}% · Grid draw ${gridPct.toFixed(1)}% — all systems healthy`;
-  }
+  // Needle position 5%–95% across the track
+  const needlePct = 5 + score * 0.9;
+
+  // Label and colour
+  let icon, label, color;
+  if (score >= 80)      { icon = '🟢'; label = 'Optimal';  color = '#10B981'; }
+  else if (score >= 60) { icon = '🟢'; label = 'Good';     color = '#22C55E'; }
+  else if (score >= 40) { icon = '🟡'; label = 'Fair';     color = '#F59E0B'; }
+  else if (score >= 20) { icon = '🟠'; label = 'Poor';     color = '#F97316'; }
+  else                  { icon = '🔴'; label = 'Critical';  color = '#EF4444'; }
+
+  // Specific overrides
+  if (currentSOC <= 15)   { icon = '🔴'; label = 'Battery Critical'; color = '#EF4444'; }
+  else if (currentSOC <= 25) { icon = '🟡'; label = 'Battery Low';   color = '#F59E0B'; }
+  else if (currentSOC >= 95) { icon = '🔵'; label = 'Battery Full';  color = '#3B82F6'; }
+
+  document.getElementById('gaugeIcon').textContent   = icon;
+  document.getElementById('gaugeText').textContent   = label;
+  document.getElementById('gaugeText').style.color   = color;
+  document.getElementById('gaugeNeedle').style.left  = needlePct + '%';
+  document.getElementById('gaugeNeedle').title =
+    `Score: ${score}/100 · SOC ${currentSOC}% · Grid ${gridPct.toFixed(1)}%`;
 }
 
 
