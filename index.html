@@ -1482,23 +1482,27 @@ function updateBatteryForecast() {
     const remainingKwh = ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH;
     const chargeRate   = Math.abs(avgNetBat);
     const hoursToFull  = chargeRate > 0 ? remainingKwh / chargeRate : null;
-    if (hoursToFull !== null && hoursToFull < 24) {
+    if (hoursToFull !== null) {
       const fullTime = new Date(now.getTime() + hoursToFull * 3600 * 1000);
       const hh = String(fullTime.getHours()).padStart(2,'0');
       const mm = String(fullTime.getMinutes()).padStart(2,'0');
-      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full by ~${hh}:${mm}</span>`;
+      const days = Math.floor(hoursToFull / 24);
+      const timeStr = days > 0 ? `~${days}d ${hh}:${mm}` : `~${hh}:${mm}`;
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full by ${timeStr}</span>`;
     } else {
-      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full today</span>`;
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW</span>`;
     }
   } else if (isDischarging) {
     const remainingKwh  = (currentSOC / 100) * BATTERY_CAPACITY_KWH;
     const dischargeRate = Math.abs(avgNetBat);
     const hoursLeft     = dischargeRate > 0 ? remainingKwh / dischargeRate : null;
-    if (hoursLeft !== null && hoursLeft < 24) {
+    if (hoursLeft !== null) {
       const emptyTime = new Date(now.getTime() + hoursLeft * 3600 * 1000);
       const hh = String(emptyTime.getHours()).padStart(2,'0');
       const mm = String(emptyTime.getMinutes()).padStart(2,'0');
-      todayLine = `<span style="color:#F97316">🔋 Discharging ${dischargeRate.toFixed(2)} kW · Empty ~${hh}:${mm}</span>`;
+      const days = Math.floor(hoursLeft / 24);
+      const timeStr = days > 0 ? `~${days}d ${hh}:${mm}` : `~${hh}:${mm}`;
+      todayLine = `<span style="color:#F97316">🔋 Discharging ${dischargeRate.toFixed(2)} kW · Empty at ${timeStr}</span>`;
     } else {
       todayLine = `<span style="color:#F97316">🔋 Discharging ${Math.abs(avgNetBat).toFixed(2)} kW</span>`;
     }
