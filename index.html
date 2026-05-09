@@ -591,9 +591,14 @@
   </div>
   <div class="header-right">
     <div class="header-cost" id="headerCost">
-      <div class="header-cost-label">💰 Total Month-to-Date</div>
+      <div class="header-cost-label">💰 Total Month-to-Date Electricity Bill (Grid)</div>
       <div class="header-cost-value" id="headerCostValue">—</div>
       <div class="header-cost-sub" id="headerCostSub">loading…</div>
+    </div>
+    <div class="header-cost" id="headerSavings" style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);">
+      <div class="header-cost-label" style="color:#34D399">💚 Projected Monthly Savings</div>
+      <div class="header-cost-value" id="headerSavingsValue" style="color:#34D399">—</div>
+      <div class="header-cost-sub" id="headerSavingsSub">vs all-grid equivalent</div>
     </div>
   </div>
 </div>
@@ -2132,6 +2137,11 @@ async function loadMonthlyBilling() {
   document.getElementById('headerCostValue').textContent = formatRand(mtdCostCents);
   document.getElementById('headerCostSub').textContent =
     `${mtdKwh.toFixed(1)} kWh · ${daysWithData} day${daysWithData !== 1 ? 's' : ''} · ${seasonLabel} rates · VAT incl`;
+
+  // Update projected savings widget
+  document.getElementById('headerSavingsValue').textContent = formatRand(projSavingsCents);
+  document.getElementById('headerSavingsSub').textContent =
+    `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining · ${seasonLabel} rates · VAT incl`;
 
   // Also refresh billing title to reflect current period
   const range = getPeriodDateRange ? getPeriodDateRange() : null;
