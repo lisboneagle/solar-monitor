@@ -35,19 +35,14 @@
     background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 100%);
     border-bottom: 1px solid var(--border);
     padding: 16px 28px;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
   }
   .header-left h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
   .header-left p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; max-width: fit-content; padding-left: 2.2rem; line-height: 1.6; }
-  .header-centre {
-    display: flex;
-    justify-content: center;
-    min-width: 200px;
-    padding: 0 12px;
-  }
   .header-right {
     display: flex;
     justify-content: flex-end;
@@ -540,44 +535,28 @@
     .upload-banner { grid-template-columns: 1fr; }
     .upload-banner-left { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 12px; }
     .weather-panel { padding-left: 0; padding-top: 12px; }
-    .header { grid-template-columns: 1fr; padding: 14px 20px; gap: 10px; }
-    .header-centre { justify-content: flex-start; padding: 0; min-width: 0; }
-    .header-right { justify-content: flex-start; }
   }
   @media (max-width: 700px) {
     .two-col { grid-template-columns: 1fr; }
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-    /* Force header to flex column so all three rows show */
-    .header {
-      display: flex !important;
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      padding: 12px 14px;
-      gap: 10px;
-    }
-    .header-left, .header-centre, .header-right {
-      width: 100%;
-    }
-    .header-centre { padding: 0; min-width: 0; }
-    .header-right { justify-content: flex-start; }
+    .header { padding: 12px 14px; flex-wrap: wrap; }
+    .header-right { width: 100%; }
     .header-cost { width: 100%; align-items: flex-start; }
     .status-gauge { width: 100%; }
     .main { padding: 12px 10px; }
     .slider-container { width: 130px; }
     .upload-banner { padding: 10px 12px; }
     .col-map-section { padding: 10px 12px; }
-    .period-filter { flex-direction: column !important; gap: 8px !important; align-items: stretch !important; }
+    .period-filter { flex-direction: column !important; gap: 8px !important; }
     .period-filter .ctrl-group { width: 100%; }
-    .period-filter .ctrl-row { flex-wrap: wrap; gap: 6px; }
-    .toggle-btn { padding: 5px 10px; font-size: 0.76rem; }
+    .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
+    .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
     .weather-days {
-      overflow-x: auto;
-      overflow-y: hidden;
+      overflow-x: auto; overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       scroll-snap-type: x mandatory;
       justify-content: flex-start;
-      padding-bottom: 8px;
-      width: 100%;
+      padding-bottom: 8px; width: 100%;
     }
     .weather-days-wrapper { width: 100%; overflow: hidden; }
     .wx-day { scroll-snap-align: start; flex-shrink: 0; }
@@ -610,30 +589,32 @@
     <h1 style="width:100%">☀️ Solar Energy Monitor</h1>
     <p id="headerSubtitle" style="width:100%;text-align:left"><strong style="color:#CBD5E1;font-size:1.05rem">4 May 2026</strong></p>
   </div>
-  <div class="header-centre">
-    <div class="status-gauge" id="statusGauge">
-      <div class="gauge-label-row">
-        <span id="gaugeIcon">🟢</span>
-        <span id="gaugeText" style="color:#10B981">System Optimal</span>
-      </div>
-      <div class="gauge-track-wrap">
-        <div class="gauge-track"></div>
-        <div class="gauge-needle" id="gaugeNeedle" style="left:80%"></div>
-      </div>
-      <div class="gauge-ticks">
-        <span>Critical</span>
-        <span>Poor</span>
-        <span>Fair</span>
-        <span>Good</span>
-        <span>Optimal</span>
-      </div>
-    </div>
-  </div>
   <div class="header-right">
     <div class="header-cost" id="headerCost">
       <div class="header-cost-label">💰 Total Month-to-Date</div>
       <div class="header-cost-value" id="headerCostValue">—</div>
       <div class="header-cost-sub" id="headerCostSub">loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- GAUGE BAR -->
+<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:center;">
+  <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
+    <div class="gauge-label-row" style="justify-content:center;margin-bottom:4px;">
+      <span id="gaugeIcon">🟢</span>
+      <span id="gaugeText" style="color:#10B981">System Optimal</span>
+    </div>
+    <div class="gauge-track-wrap">
+      <div class="gauge-track"></div>
+      <div class="gauge-needle" id="gaugeNeedle" style="left:80%"></div>
+    </div>
+    <div class="gauge-ticks">
+      <span>Critical</span>
+      <span>Poor</span>
+      <span>Fair</span>
+      <span>Good</span>
+      <span>Optimal</span>
     </div>
   </div>
 </div>
@@ -686,9 +667,6 @@
 
 <div class="main">
 
-  <!-- KPI CARDS -->
-  <div class="kpi-grid" id="kpiGrid"></div>
-
   <!-- PERIOD FILTER -->
   <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px">
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
@@ -713,6 +691,9 @@
       <div class="ctrl-label" style="color:#475569;font-size:0.68rem" id="periodNoteText">Showing today's 5-min data</div>
     </div>
   </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpiGrid"></div>
 
   <!-- CONTROLS -->
   <div class="controls">
