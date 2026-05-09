@@ -606,8 +606,8 @@
 </div>
 
 <!-- GAUGE BAR -->
-<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:center;">
-  <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
+<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+  <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;flex:1;min-width:200px;">
     <div class="gauge-label-row" style="justify-content:center;margin-bottom:4px;">
       <span id="gaugeIcon">🟢</span>
       <span id="gaugeText" style="color:#10B981">System Optimal</span>
@@ -622,6 +622,22 @@
       <span>Fair</span>
       <span>Good</span>
       <span>Optimal</span>
+    </div>
+  </div>
+
+  <!-- BATTERY FORECAST CARD -->
+  <div id="batteryForecastCard" style="
+    background:rgba(139,92,246,0.08);
+    border:1px solid rgba(139,92,246,0.3);
+    border-radius:12px;
+    padding:10px 16px;
+    flex:1;
+    min-width:200px;
+    max-width:400px;
+  ">
+    <div style="font-size:0.65rem;color:#8B5CF6;text-transform:uppercase;letter-spacing:0.6px;font-weight:700;margin-bottom:6px;">🔋 Battery Forecast</div>
+    <div id="batteryForecastContent" style="font-size:0.8rem;color:var(--muted);line-height:1.6;">
+      Calculating…
     </div>
   </div>
 </div>
@@ -1441,6 +1457,106 @@ function renderAggregatedKPIs(pd) {
     </div>`).join('');
 }
 
+// ============================================================
+// BATTERY FORECAST
+// ============================================================
+const BATTERY_CAPACITY_KWH = 16.07;
+
+function updateBatteryForecast() {
+  if (!DATA || DATA.length === 0) return;
+
+  const last        = DATA[DATA.length - 1];
+  const currentSOC  = last.soc_pct;
+  const now         = new Date();
+  const nowHour     = now.getHours() + now.getMinutes() / 60;
+
+  // Average charge rate over last 6 readings (~30 min)
+  const recent     = DATA.slice(-6);
+  const avgNetBat  = recent.reduce((s, r) => s + (r.battery_kw || 0), 0) / recent.length;
+  const isCharging    = avgNetBat < -0.05;
+  const isDischarging = avgNetBat >  0.05;
+
+  // ── Today line ────────────────────────────────────────────
+  let todayLine = '';
+  if (isCharging) {
+    const remainingKwh = ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH;
+    const chargeRate   = Math.abs(avgNetBat);
+    const hoursToFull  = chargeRate > 0 ? remainingKwh / chargeRate : null;
+    if (hoursToFull !== null && hoursToFull < 24) {
+      const fullTime = new Date(now.getTime() + hoursToFull * 3600 * 1000);
+      const hh = String(fullTime.getHours()).padStart(2,'0');
+      const mm = String(fullTime.getMinutes()).padStart(2,'0');
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full by ~${hh}:${mm}</span>`;
+    } else {
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full today</span>`;
+    }
+  } else if (isDischarging) {
+    const remainingKwh  = (currentSOC / 100) * BATTERY_CAPACITY_KWH;
+    const dischargeRate = Math.abs(avgNetBat);
+    const hoursLeft     = dischargeRate > 0 ? remainingKwh / dischargeRate : null;
+    if (hoursLeft !== null && hoursLeft < 24) {
+      const emptyTime = new Date(now.getTime() + hoursLeft * 3600 * 1000);
+      const hh = String(emptyTime.getHours()).padStart(2,'0');
+      const mm = String(emptyTime.getMinutes()).padStart(2,'0');
+      todayLine = `<span style="color:#F97316">🔋 Discharging ${dischargeRate.toFixed(2)} kW · Empty ~${hh}:${mm}</span>`;
+    } else {
+      todayLine = `<span style="color:#F97316">🔋 Discharging ${Math.abs(avgNetBat).toFixed(2)} kW</span>`;
+    }
+  } else {
+    todayLine = `<span style="color:#94A3B8">⏸ Battery idle · SOC ${currentSOC}%</span>`;
+  }
+
+  // ── Tomorrow line ─────────────────────────────────────────
+  let tomorrowLine = `<span style="color:#475569">📡 Weather data loading…</span>`;
+
+  if (wxData && wxData.daily) {
+    const d        = wxData.daily;
+    const todayStr = now.toISOString().slice(0, 10);
+    const todayIdx = d.time.indexOf(todayStr);
+    const tmrIdx   = todayIdx >= 0 ? todayIdx + 1 : 1;
+
+    if (tmrIdx < d.time.length) {
+      const tmrCloud = d.cloudcover_mean?.[tmrIdx] ?? 50;
+      const tmrUV    = d.uv_index_max?.[tmrIdx]    ?? 4;
+      const tmrCode  = d.weathercode?.[tmrIdx]      ?? 0;
+
+      // Estimate PV using today's observed peak as system capacity reference
+      const peakPV          = Math.max(...DATA.map(r => r.pv_kw || 0), 1);
+      const cloudFactor     = 1 - (tmrCloud / 100) * 0.85;
+      const uvFactor        = Math.min(tmrUV / 8, 1);
+      const peakSunHours    = 5.5 * (cloudFactor * 0.7 + uvFactor * 0.3);
+      const estPvKwh        = peakPV * peakSunHours;
+
+      // Average daily consumption from loaded DATA
+      const avgConsKwh = DATA.reduce((s, r) => s + (r.consumption_kw || 0) * (5/60), 0);
+
+      // Project tonight's closing SOC
+      const remainingDaylight = Math.max(0, 18.5 - nowHour);
+      const netKwhToday = isCharging
+        ? Math.min(Math.abs(avgNetBat) * remainingDaylight, ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH)
+        : -(Math.abs(avgNetBat) * remainingDaylight);
+      const tonightSOC = Math.min(100, Math.max(0,
+        currentSOC + (netKwhToday / BATTERY_CAPACITY_KWH) * 100
+      ));
+
+      // Tomorrow end-of-day SOC
+      const netKwhTmr  = estPvKwh - avgConsKwh;
+      const socChange  = (netKwhTmr / BATTERY_CAPACITY_KWH) * 100;
+      const tmrEndSOC  = Math.min(100, Math.max(0, tonightSOC + socChange));
+
+      const socColor = tmrEndSOC >= 70 ? '#10B981' : tmrEndSOC >= 40 ? '#F59E0B' : '#EF4444';
+      const weather  = wxCodeInfo(tmrCode);
+      const tmrDate  = new Date(d.time[tmrIdx] + 'T12:00:00');
+      const tmrLabel = tmrDate.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      tomorrowLine = `<span style="color:${socColor}">${weather.icon} ${tmrLabel}: ~${estPvKwh.toFixed(1)} kWh PV · end-of-day SOC <strong>~${Math.round(tmrEndSOC)}%</strong></span>`;
+    }
+  }
+
+  document.getElementById('batteryForecastContent').innerHTML =
+    `${todayLine}<br>${tomorrowLine}`;
+}
+
 
 function updateStatusBadge() {
   const last = DATA[DATA.length - 1];
@@ -1511,6 +1627,7 @@ function renderKPIs() {
       <div class="kpi-sub">${c.sub}</div>
     </div>`).join('');
   updateStatusBadge();
+  updateBatteryForecast();
 }
 
 // ============================================================
@@ -2230,6 +2347,7 @@ async function loadWeather() {
     if (!resp.ok) throw new Error('fetch failed');
     wxData = await resp.json();
     renderWeather();
+    updateBatteryForecast(); // refresh tomorrow estimate now weather is available
   } catch(e) {
     document.getElementById('weatherDays').innerHTML =
       `<div class="wx-loading" style="color:#F87171">⚠️ Weather unavailable</div>`;
