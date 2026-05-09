@@ -1,13 +1,6 @@
 // sw.js — Solar Energy Monitor Service Worker
-// Minimal service worker required for PWA installability on Android/Chrome
-// Caches the shell so the app loads offline
-
-const CACHE = 'solar-monitor-v1';
-const SHELL = [
-  './',
-  './index.html',
-  './manifest.json',
-];
+const CACHE = 'solar-monitor-v2';
+const SHELL = ['./manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -24,14 +17,19 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first for data files (latest.json, daily archives)
-  if (e.request.url.includes('/data/')) {
+  const url = new URL(e.request.url);
+
+  // Always network-first for HTML and data — never serve stale versions
+  if (url.pathname.endsWith('.html') ||
+      url.pathname.endsWith('/') ||
+      url.pathname.includes('/data/')) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match(e.request))
     );
     return;
   }
-  // Cache first for shell assets
+
+  // Cache-first for static assets (manifest, CDN libraries)
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
