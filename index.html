@@ -627,7 +627,7 @@
 
   <!-- PERIOD FILTER -->
   <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px">
-    <div class="ctrl-group">
+    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
         <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')">Day</button>
@@ -636,7 +636,7 @@
         <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')">Year</button>
       </div>
     </div>
-    <div class="ctrl-group">
+    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">Navigate</div>
       <div class="ctrl-row">
         <button class="toggle-btn" onclick="shiftPeriod(-1)">◀ Prev</button>
@@ -1459,11 +1459,11 @@ function renderKPIs() {
 // SERIES CONTROLS
 // ============================================================
 const SERIES_CONF = [
-  { key: 'Production', color: '#F59E0B', field: 'production_kw' },
-  { key: 'Consumption', color: '#3B82F6', field: 'consumption_kw' },
+  { key: 'Production', color: '#22C55E', field: 'production_kw' },
+  { key: 'Consumption', color: '#F97316', field: 'consumption_kw' },
   { key: 'Grid', color: '#EF4444', field: 'grid_kw' },
   { key: 'Battery', color: '#8B5CF6', field: 'battery_kw' },
-  { key: 'PV', color: '#F97316', field: 'pv_kw' },
+  { key: 'PV', color: '#3B82F6', field: 'pv_kw' },
 ];
 
 function renderSeriesToggle() {
@@ -2037,9 +2037,9 @@ async function loadMonthlyBilling() {
     { label: 'Daily Savings',         value: formatRand(avgDailySavingsCents), unit: '/day',   color: '#34D399' },
     { label: 'Proj. Monthly Savings', value: formatRand(projSavingsCents),     unit: '',       color: '#A78BFA' },
   ].map(c => `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-top:3px solid ${c.color}">
-      <div style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600">${c.label}</div>
-      <div style="font-size:1.3rem;font-weight:700;color:${c.color};margin:3px 0 1px;line-height:1">${c.value}<span style="font-size:0.8rem;margin-left:2px;font-weight:500">${c.unit}</span></div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-top:3px solid ${c.color};display:flex;flex-direction:column;">
+      <div style="font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600;min-height:2.2em;display:flex;align-items:flex-start;">${c.label}</div>
+      <div style="font-size:1.3rem;font-weight:700;color:${c.color};line-height:1;margin-top:auto;">${c.value}<span style="font-size:0.8rem;margin-left:2px;font-weight:500">${c.unit}</span></div>
     </div>`).join('');
 
   // Render breakdown table
