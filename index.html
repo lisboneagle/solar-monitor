@@ -626,7 +626,7 @@
   <div class="kpi-grid" id="kpiGrid"></div>
 
   <!-- PERIOD FILTER -->
-  <div class="controls" style="margin-bottom:10px;padding:10px 20px">
+  <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px">
     <div class="ctrl-group">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
@@ -652,7 +652,7 @@
 
   <!-- CONTROLS -->
   <div class="controls">
-    <div class="ctrl-group">
+    <div class="ctrl-group" id="sliderCtrlGroup">
       <div class="ctrl-label">Time Range</div>
       <div class="ctrl-row">
         <span class="slider-time" id="tStart">00:00</span>
@@ -1231,7 +1231,7 @@ function rebuildChartsFromPeriod() {
   mainChart = null; socChart = null; donutChart = null; barChart = null;
 
   // Show/hide slider row using ID rather than fragile DOM traversal
-  const sliderRow = document.getElementById('sliderWrap')?.closest('.ctrl-group');
+  const sliderRow = document.getElementById('sliderCtrlGroup');
   const isRaw = !periodData || periodData.type === 'raw';
   if (sliderRow) sliderRow.style.display = isRaw ? '' : 'none';
 
@@ -1957,6 +1957,9 @@ async function loadMonthlyBilling() {
         .then(r => r.ok ? r.json() : null)
         .then(json => {
           if (!json || !json.rows || json.rows.length === 0) return { date: dateKey, gridKwh: 0, consKwh: 0, hasData: false };
+          // Require at least one row with meaningful consumption to count as a real day
+          const hasRealData = json.rows.some(r => (r.consumption_kw || 0) > 0.01);
+          if (!hasRealData) return { date: dateKey, gridKwh: 0, consKwh: 0, hasData: false };
           const gridKwh = json.rows.reduce((s, r) => s + Math.max(0, r.grid_kw || 0) * (5/60), 0);
           const consKwh = json.rows.reduce((s, r) => s + Math.max(0, r.consumption_kw || 0) * (5/60), 0);
           return { date: dateKey, gridKwh, consKwh, hasData: true };
@@ -2030,7 +2033,7 @@ async function loadMonthlyBilling() {
     { label: 'Projected Monthly',     value: projectedKwh.toFixed(0),         unit: 'kWh',     color: '#8B5CF6' },
     { label: 'Projected Cost',        value: formatRand(projCostCents),        unit: '',        color: '#14B8A6' },
     { label: 'Avg Daily Grid',        value: avgDailyGridKwh.toFixed(2),      unit: 'kWh/day', color: '#3B82F6' },
-    { label: 'Days Recorded',         value: `${daysWithData}/${dayOfMonth}`, unit: 'days',    color: '#10B981' },
+    { label: 'Days Recorded',         value: `${daysWithData}/${daysInMonth}`, unit: 'days',    color: '#10B981' },
     { label: 'Daily Savings',         value: formatRand(avgDailySavingsCents), unit: '/day',   color: '#34D399' },
     { label: 'Proj. Monthly Savings', value: formatRand(projSavingsCents),     unit: '',       color: '#A78BFA' },
   ].map(c => `
