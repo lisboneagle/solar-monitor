@@ -537,20 +537,31 @@
     .upload-banner { grid-template-columns: 1fr; }
     .upload-banner-left { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 12px; }
     .weather-panel { padding-left: 0; padding-top: 12px; }
-    .header { grid-template-columns: 1fr 1fr; }
-    .header-centre { justify-content: flex-start; }
-    .header-right { grid-column: 1 / -1; justify-content: flex-start; }
+    .header { grid-template-columns: 1fr; }
+    .header-centre { justify-content: center; margin: 8px 0; }
+    .header-right { justify-content: center; }
+    .status-gauge { min-width: 180px; }
+    .gauge-track-wrap { width: 180px; }
+    .gauge-ticks { width: 180px; }
   }
   @media (max-width: 700px) {
     .two-col { grid-template-columns: 1fr; }
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .header { grid-template-columns: 1fr; padding: 14px 16px; }
-    .header-centre { justify-content: flex-start; }
-    .header-right { justify-content: flex-start; }
+    .header-centre { justify-content: center; margin: 6px 0; }
+    .header-right { justify-content: center; }
+    .header-cost { width: 100%; align-items: center; }
     .main { padding: 14px 12px; }
-    .slider-container { width: 160px; }
+    .slider-container { width: 140px; }
     .upload-banner { padding: 12px 14px; }
     .col-map-section { padding: 10px 14px; }
+    /* Period filter wraps on mobile */
+    .period-filter { flex-direction: column !important; gap: 8px !important; }
+    .period-filter .ctrl-group { width: 100%; }
+    .period-filter .ctrl-row { flex-wrap: wrap; gap: 6px; }
+    .status-gauge { min-width: 160px; }
+    .gauge-track-wrap { width: 160px; }
+    .gauge-ticks { width: 160px; font-size: 0.5rem; }
     .weather-days {
       overflow-x: auto;
       overflow-y: hidden;
