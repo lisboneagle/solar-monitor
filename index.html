@@ -233,6 +233,7 @@
     cursor: pointer;
     transition: all 0.15s;
     font-family: inherit;
+    white-space: nowrap;
   }
   .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
   .cb-group { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -687,10 +688,10 @@
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">Navigate Day</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" onclick="shiftPeriod(-1)" style="flex:1;text-align:center">◀ Prev</button>
-        <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:80px;text-align:center">Today</span>
-        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="flex:1;text-align:center">Next ▶</button>
-        <button class="toggle-btn" onclick="resetPeriod()" style="flex:1;text-align:center;font-size:0.72rem">↺ Reset</button>
+        <button class="toggle-btn" onclick="shiftPeriod(-1)" style="flex:1;text-align:center;white-space:nowrap">◀ Prev</button>
+        <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:60px;text-align:center;white-space:nowrap">Today</span>
+        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="flex:1;text-align:center;white-space:nowrap">Next ▶</button>
+        <button class="toggle-btn" onclick="resetPeriod()" style="flex:1;text-align:center;white-space:nowrap;font-size:0.72rem">↺ Reset</button>
       </div>
     </div>
     <div class="ctrl-group" id="periodNote">
