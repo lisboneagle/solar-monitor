@@ -1462,55 +1462,114 @@ function renderAggregatedKPIs(pd) {
 // ============================================================
 const BATTERY_CAPACITY_KWH = 16.07;
 
+// Compute historic average nightly discharge rate from today's DATA
+// Uses night hours (18:00–06:00) where battery_kw > 0 (discharging)
+function getHistoricNightlyDischargeRate() {
+  const nightRows = DATA.filter(r => {
+    const h = parseInt(r.time.slice(11, 13));
+    return (h >= 18 || h < 6) && (r.battery_kw || 0) > 0.05;
+  });
+  if (nightRows.length < 3) return null;
+  return nightRows.reduce((s, r) => s + r.battery_kw, 0) / nightRows.length;
+}
+
+function getHistoricDaytimeChargeRate() {
+  const dayRows = DATA.filter(r => {
+    const h = parseInt(r.time.slice(11, 13));
+    return h >= 7 && h <= 17 && (r.battery_kw || 0) < -0.05;
+  });
+  if (dayRows.length < 3) return null;
+  return Math.abs(dayRows.reduce((s, r) => s + r.battery_kw, 0) / dayRows.length);
+}
+
+function formatTimeEstimate(hoursFromNow) {
+  const now     = new Date();
+  const target  = new Date(now.getTime() + hoursFromNow * 3600 * 1000);
+  const hh      = String(target.getHours()).padStart(2,'0');
+  const mm      = String(target.getMinutes()).padStart(2,'0');
+  const days    = Math.floor(hoursFromNow / 24);
+  const dayName = target.toLocaleDateString('en-ZA', { weekday: 'short' });
+  return days > 0 ? `${dayName} ${hh}:${mm}` : `~${hh}:${mm}`;
+}
+
 function updateBatteryForecast() {
   if (!DATA || DATA.length === 0) return;
 
-  const last        = DATA[DATA.length - 1];
-  const currentSOC  = last.soc_pct;
-  const now         = new Date();
-  const nowHour     = now.getHours() + now.getMinutes() / 60;
+  const last       = DATA[DATA.length - 1];
+  const currentSOC = last.soc_pct;
+  const now        = new Date();
+  const nowHour    = now.getHours() + now.getMinutes() / 60;
 
-  // Average charge rate over last 6 readings (~30 min)
-  const recent     = DATA.slice(-6);
-  const avgNetBat  = recent.reduce((s, r) => s + (r.battery_kw || 0), 0) / recent.length;
-  const isCharging    = avgNetBat < -0.05;
-  const isDischarging = avgNetBat >  0.05;
+  // Current rate: average of last 6 readings (~30 min)
+  const recent       = DATA.slice(-6);
+  const currentRate  = recent.reduce((s, r) => s + (r.battery_kw || 0), 0) / recent.length;
+  const isCharging    = currentRate < -0.05;
+  const isDischarging = currentRate >  0.05;
 
-  // ── Today line ────────────────────────────────────────────
+  // Historic rates from today's data
+  const historicDischarge = getHistoricNightlyDischargeRate();
+  const historicCharge    = getHistoricDaytimeChargeRate();
+
+  // ── Today line ────────────────────────────────────────────────────────────
   let todayLine = '';
+
   if (isCharging) {
-    const remainingKwh = ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH;
-    const chargeRate   = Math.abs(avgNetBat);
-    const hoursToFull  = chargeRate > 0 ? remainingKwh / chargeRate : null;
+    const currentChargeKw  = Math.abs(currentRate);
+    const historicChargeKw = historicCharge || currentChargeKw;
+    const remainingKwh     = ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH;
+
+    // Use current rate for near-term; blend in historic for longer estimates
+    // If current rate would take >3h, blend 50/50 with historic daytime avg
+    const nearTermHours = currentChargeKw > 0 ? remainingKwh / currentChargeKw : null;
+    let effectiveRate   = currentChargeKw;
+    let rateNote        = 'current rate';
+
+    if (nearTermHours !== null && nearTermHours > 3 && historicCharge) {
+      effectiveRate = (currentChargeKw + historicChargeKw) / 2;
+      rateNote      = 'blended rate';
+    }
+
+    const hoursToFull = effectiveRate > 0 ? remainingKwh / effectiveRate : null;
     if (hoursToFull !== null) {
-      const fullTime = new Date(now.getTime() + hoursToFull * 3600 * 1000);
-      const hh = String(fullTime.getHours()).padStart(2,'0');
-      const mm = String(fullTime.getMinutes()).padStart(2,'0');
-      const days = Math.floor(hoursToFull / 24);
-      const timeStr = days > 0 ? `~${days}d ${hh}:${mm}` : `~${hh}:${mm}`;
-      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW · Full by ${timeStr}</span>`;
+      const timeStr = formatTimeEstimate(hoursToFull);
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${currentChargeKw.toFixed(2)} kW · Full by ${timeStr} <span style="font-size:0.7em;color:#475569">(${rateNote})</span></span>`;
     } else {
-      todayLine = `<span style="color:#22C55E">⚡ Charging ${chargeRate.toFixed(2)} kW</span>`;
+      todayLine = `<span style="color:#22C55E">⚡ Charging ${currentChargeKw.toFixed(2)} kW</span>`;
     }
+
   } else if (isDischarging) {
-    const remainingKwh  = (currentSOC / 100) * BATTERY_CAPACITY_KWH;
-    const dischargeRate = Math.abs(avgNetBat);
-    const hoursLeft     = dischargeRate > 0 ? remainingKwh / dischargeRate : null;
-    if (hoursLeft !== null) {
-      const emptyTime = new Date(now.getTime() + hoursLeft * 3600 * 1000);
-      const hh = String(emptyTime.getHours()).padStart(2,'0');
-      const mm = String(emptyTime.getMinutes()).padStart(2,'0');
-      const days = Math.floor(hoursLeft / 24);
-      const timeStr = days > 0 ? `~${days}d ${hh}:${mm}` : `~${hh}:${mm}`;
-      todayLine = `<span style="color:#F97316">🔋 Discharging ${dischargeRate.toFixed(2)} kW · Empty at ${timeStr}</span>`;
-    } else {
-      todayLine = `<span style="color:#F97316">🔋 Discharging ${Math.abs(avgNetBat).toFixed(2)} kW</span>`;
+    const currentDischargeKw  = Math.abs(currentRate);
+    const historicDischargeKw = historicDischarge || currentDischargeKw;
+    const remainingKwh        = (currentSOC / 100) * BATTERY_CAPACITY_KWH;
+
+    // If current rate is very low (solar partially offsetting load),
+    // blend with historic nightly rate for a more realistic overnight estimate
+    let effectiveRate = currentDischargeKw;
+    let rateNote      = 'current rate';
+
+    if (currentDischargeKw < 0.15 && historicDischarge) {
+      // Current rate is suspiciously low — likely solar offset; use historic
+      effectiveRate = historicDischargeKw;
+      rateNote      = 'historic avg';
+    } else if (historicDischarge && Math.abs(currentDischargeKw - historicDischargeKw) / historicDischargeKw > 0.5) {
+      // Current rate differs >50% from historic — blend them
+      effectiveRate = (currentDischargeKw * 0.4 + historicDischargeKw * 0.6);
+      rateNote      = 'blended rate';
     }
+
+    const hoursLeft = effectiveRate > 0 ? remainingKwh / effectiveRate : null;
+    if (hoursLeft !== null) {
+      const timeStr = formatTimeEstimate(hoursLeft);
+      todayLine = `<span style="color:#F97316">🔋 Discharging ${currentDischargeKw.toFixed(2)} kW · Empty at ${timeStr} <span style="font-size:0.7em;color:#475569">(${rateNote})</span></span>`;
+    } else {
+      todayLine = `<span style="color:#F97316">🔋 Discharging ${currentDischargeKw.toFixed(2)} kW</span>`;
+    }
+
   } else {
     todayLine = `<span style="color:#94A3B8">⏸ Battery idle · SOC ${currentSOC}%</span>`;
   }
 
-  // ── Tomorrow line ─────────────────────────────────────────
+  // ── Tomorrow line ─────────────────────────────────────────────────────────
   let tomorrowLine = `<span style="color:#475569">📡 Weather data loading…</span>`;
 
   if (wxData && wxData.daily) {
@@ -1524,12 +1583,12 @@ function updateBatteryForecast() {
       const tmrUV    = d.uv_index_max?.[tmrIdx]    ?? 4;
       const tmrCode  = d.weathercode?.[tmrIdx]      ?? 0;
 
-      // Estimate PV using today's observed peak as system capacity reference
-      const peakPV          = Math.max(...DATA.map(r => r.pv_kw || 0), 1);
-      const cloudFactor     = 1 - (tmrCloud / 100) * 0.85;
-      const uvFactor        = Math.min(tmrUV / 8, 1);
-      const peakSunHours    = 5.5 * (cloudFactor * 0.7 + uvFactor * 0.3);
-      const estPvKwh        = peakPV * peakSunHours;
+      // System capacity from today's observed peak PV
+      const peakPV      = Math.max(...DATA.map(r => r.pv_kw || 0), 1);
+      const cloudFactor = 1 - (tmrCloud / 100) * 0.85;
+      const uvFactor    = Math.min(tmrUV / 8, 1);
+      const peakSunHrs  = 5.5 * (cloudFactor * 0.7 + uvFactor * 0.3);
+      const estPvKwh    = peakPV * peakSunHrs;
 
       // Average daily consumption from loaded DATA
       const avgConsKwh = DATA.reduce((s, r) => s + (r.consumption_kw || 0) * (5/60), 0);
@@ -1537,16 +1596,16 @@ function updateBatteryForecast() {
       // Project tonight's closing SOC
       const remainingDaylight = Math.max(0, 18.5 - nowHour);
       const netKwhToday = isCharging
-        ? Math.min(Math.abs(avgNetBat) * remainingDaylight, ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH)
-        : -(Math.abs(avgNetBat) * remainingDaylight);
+        ? Math.min(Math.abs(currentRate) * remainingDaylight, ((100 - currentSOC) / 100) * BATTERY_CAPACITY_KWH)
+        : -(Math.abs(currentRate) * remainingDaylight);
       const tonightSOC = Math.min(100, Math.max(0,
         currentSOC + (netKwhToday / BATTERY_CAPACITY_KWH) * 100
       ));
 
       // Tomorrow end-of-day SOC
-      const netKwhTmr  = estPvKwh - avgConsKwh;
-      const socChange  = (netKwhTmr / BATTERY_CAPACITY_KWH) * 100;
-      const tmrEndSOC  = Math.min(100, Math.max(0, tonightSOC + socChange));
+      const netKwhTmr = estPvKwh - avgConsKwh;
+      const socChange = (netKwhTmr / BATTERY_CAPACITY_KWH) * 100;
+      const tmrEndSOC = Math.min(100, Math.max(0, tonightSOC + socChange));
 
       const socColor = tmrEndSOC >= 70 ? '#10B981' : tmrEndSOC >= 40 ? '#F59E0B' : '#EF4444';
       const weather  = wxCodeInfo(tmrCode);
@@ -1560,6 +1619,7 @@ function updateBatteryForecast() {
   document.getElementById('batteryForecastContent').innerHTML =
     `${todayLine}<br>${tomorrowLine}`;
 }
+
 
 
 function updateStatusBadge() {
