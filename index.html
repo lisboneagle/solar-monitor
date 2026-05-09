@@ -1016,16 +1016,10 @@ function loadDataFromMap(map) {
   document.getElementById('sliderFill').style.left = '0%';
   document.getElementById('sliderFill').style.width = '100%';
 
-  // Destroy and rebuild all charts
-  [mainChart, socChart, donutChart, barChart].forEach(c => { if (c) c.destroy(); });
-  mainChart = null; socChart = null; donutChart = null; barChart = null;
-
-  renderKPIs();
-  buildMainChart();
-  buildSOCChart();
-  buildDonutChart();
-  buildBarChart();
-  renderInsights();
+  // Charts are rebuilt by loadPeriodData() called from init()
+  // Just reset indices so the next rebuild uses the full dataset
+  startIdx = 0;
+  endIdx = DATA.length - 1;
 }
 
 // ============================================================
@@ -2307,10 +2301,9 @@ async function init() {
     const resp = await fetch("data/latest.json", { cache: "no-store" });
     if (resp.ok) {
       const json = await resp.json();
-      const rows = json.rows || json;   // support both {rows:[]} and plain []
+      const rows = json.rows || json;
       if (Array.isArray(rows) && rows.length > 0) {
         rawUploadedRows = rows;
-        // Build a direct identity map (fields already match dashboard schema)
         const identityMap = {
           time:           "time",
           production_kw:  "production_kw",
@@ -2331,28 +2324,20 @@ async function init() {
         loaded = true;
       }
     }
-  } catch (e) {
-    // Fetch failed — likely running locally or latest.json doesn't exist yet
-  }
+  } catch (e) { /* local or no file */ }
 
   if (!loaded) {
-    // Fall back to the built-in sample dataset
     setUploadStatus("Using built-in sample data", "idle");
     document.getElementById("uploadHint").textContent =
-      "data/latest.json not found — showing sample data. Upload a file or deploy with GitHub Actions to auto-load live data.";
-    renderKPIs();
-    renderSeriesToggle();
-    buildMainChart();
-    buildSOCChart();
-    buildDonutChart();
-    buildBarChart();
-    renderInsights();
-    initSlider();
+      "data/latest.json not found — showing sample data.";
   }
 
-  // Always attempt monthly billing (works independently of daily data)
+  // Save today's data snapshot for period navigation, then trigger period load
+  todayData = [...DATA];
+  loadPeriodData();
+
+  // Always load billing and weather
   loadMonthlyBilling();
-  // Load weather forecast
   loadWeather();
 }
 
