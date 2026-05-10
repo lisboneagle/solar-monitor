@@ -771,6 +771,15 @@
     <div id="insightsPanel"></div>
   </div>
 
+  <!-- LOAD SHIFTING -->
+  <div class="insights-card" style="margin-top:16px" id="loadShiftPanel">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div class="insights-title" style="margin-bottom:0">⚡ Load Shifting Recommendations</div>
+      <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
+    </div>
+    <div id="loadShiftContent"></div>
+  </div>
+
   <!-- MONTHLY BILLING -->
   <div class="insights-card" style="margin-top:16px" id="billingPanel">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
@@ -2202,8 +2211,7 @@ function pvHint(cloudPct, uvIdx) {
   return             { text: '☁️ Poor PV',             color: '#94A3B8' };
 }
 
-async function loadWeather() {
-  const lat = -26.7413, lon = 27.8498;
+async function loadWeather() {  const lat = -26.7413, lon = 27.8498;
 
   // Reverse geocode to get readable location name
   try {
@@ -2302,6 +2310,273 @@ function renderWeather() {
 }
 
 
+// ============================================================
+// LOAD SHIFTING ENGINE
+// ============================================================
+
+const APPLIANCES = {
+  manual: [
+    { name: 'Washing Machine', kw: 2.2,  icon: '🫧', duration: 1.5 },
+    { name: 'Dishwasher',      kw: 2.4,  icon: '🍽️', duration: 1.5 },
+  ],
+  timers: [
+    { name: 'Pool Pump',  kw: 0.8, icon: '🏊', start: 9,    end: 14,   label: '09:00–14:00' },
+    { name: 'Geyser',     kw: 3.0, icon: '🚿', start: 10,   end: 12,   label: '10:00–12:00', secondary: { start: 15.5, end: 16.5, label: '15:30–16:30' } },
+  ],
+};
+
+function getHourlySolarProfile() {
+  // Build hourly avg PV from today's DATA
+  const hourly = {};
+  for (let h = 0; h < 24; h++) hourly[h] = [];
+  DATA.forEach(r => {
+    const h = parseInt(r.time.slice(11, 13));
+    hourly[h].push(r.pv_kw || 0);
+  });
+  return Array.from({ length: 24 }, (_, h) =>
+    hourly[h].length ? hourly[h].reduce((a, b) => a + b, 0) / hourly[h].length : null
+  );
+}
+
+function getHourlyConsumptionProfile() {
+  const hourly = {};
+  for (let h = 0; h < 24; h++) hourly[h] = [];
+  DATA.forEach(r => {
+    const h = parseInt(r.time.slice(11, 13));
+    hourly[h].push(r.consumption_kw || 0);
+  });
+  return Array.from({ length: 24 }, (_, h) =>
+    hourly[h].length ? hourly[h].reduce((a, b) => a + b, 0) / hourly[h].length : null
+  );
+}
+
+function getForecastSolarProfile() {
+  if (!wxData || !wxData.daily) return null;
+  const d        = wxData.daily;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayIdx = d.time.indexOf(todayStr);
+
+  // Get today and tomorrow cloud/UV
+  const profiles = {};
+  [0, 1].forEach(offset => {
+    const idx = todayIdx + offset;
+    if (idx < 0 || idx >= d.time.length) return;
+    const cloud      = d.cloudcover_mean?.[idx] ?? 50;
+    const uv         = d.uv_index_max?.[idx] ?? 4;
+    const cloudFactor = 1 - (cloud / 100) * 0.85;
+    const uvFactor    = Math.min(uv / 8, 1);
+    const efficiency  = cloudFactor * 0.7 + uvFactor * 0.3;
+
+    // Peak PV from historic data as system reference
+    const peakPV = Math.max(...DATA.map(r => r.pv_kw || 0), 1);
+
+    // Bell curve solar profile: peaks at solar noon (~13:00 SAST)
+    const hourly = Array.from({ length: 24 }, (_, h) => {
+      if (h < 6 || h > 19) return 0;
+      const deviation = h - 13;
+      const bell      = Math.exp(-(deviation * deviation) / 16);
+      return peakPV * efficiency * bell;
+    });
+
+    profiles[offset === 0 ? 'today' : 'tomorrow'] = { hourly, efficiency, cloud, uv, date: d.time[idx] };
+  });
+  return profiles;
+}
+
+function findBestWindows(solarProfile, consProfile, durationHours, applianceKw) {
+  const windows = [];
+  const nowHour = new Date().getHours() + new Date().getMinutes() / 60;
+
+  for (let startH = 6; startH <= 20 - durationHours; startH += 0.5) {
+    // Only future windows for today
+    if (startH < nowHour - 0.5) continue;
+
+    let totalSurplus = 0;
+    let valid        = true;
+    const slots      = Math.round(durationHours * 2); // 30-min slots
+
+    for (let s = 0; s < slots; s++) {
+      const h       = Math.floor(startH + s * 0.5);
+      const solar   = solarProfile[h];
+      const cons    = consProfile[h] ?? 0.4;
+      if (solar === null) { valid = false; break; }
+      const net     = solar - cons; // surplus before adding appliance
+      totalSurplus += net;
+    }
+
+    if (!valid) continue;
+
+    const avgSurplus = totalSurplus / slots;
+    const endH       = startH + durationHours;
+    windows.push({ startH, endH, avgSurplus, totalSurplus });
+  }
+
+  // Sort by best surplus — most solar coverage first
+  windows.sort((a, b) => b.avgSurplus - a.avgSurplus);
+  return windows.slice(0, 3);
+}
+
+function fmtHour(h) {
+  const hh = String(Math.floor(h)).padStart(2,'0');
+  const mm = String(Math.round((h % 1) * 60)).padStart(2,'0');
+  return `${hh}:${mm}`;
+}
+
+function windowRating(avgSurplus, applianceKw) {
+  const coveragePct = Math.min(100, Math.max(0, (avgSurplus / applianceKw + 1) / 2 * 100));
+  if (avgSurplus > applianceKw * 0.5)  return { label: '🟢 Excellent', color: '#10B981' };
+  if (avgSurplus > 0)                  return { label: '🟡 Good',      color: '#F59E0B' };
+  if (avgSurplus > -applianceKw * 0.3) return { label: '🟠 Fair',      color: '#F97316' };
+  return                                      { label: '🔴 Poor',       color: '#EF4444' };
+}
+
+function checkTimerAlignment(solarProfile, timer) {
+  const slots   = [];
+  for (let h = timer.start; h < timer.end; h++) {
+    if (solarProfile[h] !== null) slots.push(solarProfile[h]);
+  }
+  if (!slots.length) return null;
+  const avgSolar = slots.reduce((a, b) => a + b, 0) / slots.length;
+  const coverage = avgSolar / timer.kw;
+
+  // Also check secondary slot if exists
+  let secCoverage = null;
+  if (timer.secondary) {
+    const secSlots = [];
+    for (let h = Math.floor(timer.secondary.start); h < timer.secondary.end; h++) {
+      if (solarProfile[h] !== null) secSlots.push(solarProfile[h]);
+    }
+    if (secSlots.length) {
+      const secAvg = secSlots.reduce((a, b) => a + b, 0) / secSlots.length;
+      secCoverage  = secAvg / timer.kw;
+    }
+  }
+  return { avgSolar, coverage, secCoverage };
+}
+
+async function renderLoadShifting() {
+  const solarProfile = getHourlySolarProfile();
+  const consProfile  = getHourlyConsumptionProfile();
+  const forecasts    = getForecastSolarProfile();
+  const now          = new Date();
+  const nowHour      = now.getHours() + now.getMinutes() / 60;
+  const todayStr     = now.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  // Use forecast solar if available, else fall back to today's observed
+  const todaySolar   = (forecasts?.today?.hourly)
+    ? forecasts.today.hourly.map((v, h) => solarProfile[h] !== null ? Math.max(solarProfile[h], v * 0.5) : v)
+    : solarProfile;
+  const tmrSolar     = forecasts?.tomorrow?.hourly || null;
+
+  let html = '';
+
+  // ── SECTION 1: Manual appliance recommendations ───────────────────────────
+  html += `<div style="font-size:0.78rem;font-weight:700;color:var(--text);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">🫧 Manual Appliances — Best Windows Today</div>`;
+
+  const hasFutureSolar = todaySolar.some((v, h) => h >= nowHour && v > 0.1);
+
+  if (!hasFutureSolar) {
+    html += `<div class="insight-item" style="color:#94A3B8">☀️ Solar generation has ended for today. See tomorrow's recommendations below.</div>`;
+  } else {
+    APPLIANCES.manual.forEach(app => {
+      const windows = findBestWindows(todaySolar, consProfile, app.duration, app.kw);
+      html += `<div class="insight-item">`;
+      html += `<strong>${app.icon} ${app.name}</strong> (${app.kw} kW · ~${app.duration}h runtime)<br>`;
+      if (windows.length === 0) {
+        html += `<span style="color:#94A3B8">No strong solar windows remaining today</span>`;
+      } else {
+        windows.forEach((w, i) => {
+          const rating  = windowRating(w.avgSurplus, app.kw);
+          const surplus = w.avgSurplus >= 0
+            ? `~${(w.avgSurplus).toFixed(1)} kW surplus`
+            : `~${Math.abs(w.avgSurplus).toFixed(1)} kW grid supplement`;
+          const prefix  = i === 0 ? '⭐ Best:' : i === 1 ? '2nd:' : '3rd:';
+          html += `&nbsp;&nbsp;<span style="color:${rating.color}">${prefix} ${fmtHour(w.startH)}–${fmtHour(w.endH)} ${rating.label} · ${surplus}</span><br>`;
+        });
+      }
+      html += `</div>`;
+    });
+  }
+
+  // ── SECTION 2: Timer validation ───────────────────────────────────────────
+  html += `<div style="font-size:0.78rem;font-weight:700;color:var(--text);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">⏱ Timer Schedule Validation</div>`;
+
+  APPLIANCES.timers.forEach(timer => {
+    const result = checkTimerAlignment(todaySolar, timer);
+    html += `<div class="insight-item">`;
+    html += `<strong>${timer.icon} ${timer.name}</strong> — Timer: ${timer.label}`;
+    if (timer.secondary) html += ` &amp; ${timer.secondary.label}`;
+    html += `<br>`;
+
+    if (!result) {
+      html += `<span style="color:#94A3B8">Insufficient solar data to validate</span>`;
+    } else {
+      const pct     = Math.round(result.coverage * 100);
+      const color   = result.coverage > 0.8 ? '#10B981' : result.coverage > 0.5 ? '#F59E0B' : '#EF4444';
+      const verdict = result.coverage > 0.8 ? '✅ Well aligned with solar' :
+                      result.coverage > 0.5 ? '🟡 Partially covered by solar' :
+                      '⚠️ Mostly grid-powered — consider shifting timer';
+      html += `<span style="color:${color}">Primary slot: ${verdict} (~${pct}% solar coverage, avg ${result.avgSolar.toFixed(2)} kW)</span>`;
+
+      if (result.secCoverage !== null) {
+        const secPct   = Math.round(result.secCoverage * 100);
+        const secColor = result.secCoverage > 0.8 ? '#10B981' : result.secCoverage > 0.5 ? '#F59E0B' : '#EF4444';
+        const secVerdict = result.secCoverage > 0.8 ? '✅ Good solar coverage' :
+                           result.secCoverage > 0.5 ? '🟡 Partial solar coverage' :
+                           '⚠️ Low solar — mostly grid';
+        html += `<br><span style="color:${secColor}">Secondary slot (${timer.secondary.label}): ${secVerdict} (~${secPct}% coverage)</span>`;
+      }
+    }
+    html += `</div>`;
+  });
+
+  // ── SECTION 3: Tomorrow planning ─────────────────────────────────────────
+  if (tmrSolar) {
+    const tmrDate   = forecasts.tomorrow.date;
+    const tmrDt     = new Date(tmrDate + 'T12:00:00');
+    const tmrLabel  = tmrDt.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short' });
+    const tmrCloud  = forecasts.tomorrow.cloud;
+    const tmrEff    = Math.round(forecasts.tomorrow.efficiency * 100);
+    const wxInfo    = wxData.daily.weathercode
+      ? wxCodeInfo(wxData.daily.weathercode[wxData.daily.time.indexOf(tmrDate)] ?? 0)
+      : { icon: '☀️' };
+
+    html += `<div style="font-size:0.78rem;font-weight:700;color:var(--text);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px">${wxInfo.icon} Tomorrow — ${tmrLabel} (${tmrCloud}% cloud · ${tmrEff}% efficiency)</div>`;
+
+    // Use a flat consumption profile for tomorrow (no real data yet)
+    const tmrCons = Array(24).fill(0.45);
+
+    APPLIANCES.manual.forEach(app => {
+      const windows = findBestWindows(tmrSolar, tmrCons, app.duration, app.kw);
+      html += `<div class="insight-item">`;
+      html += `<strong>${app.icon} ${app.name}</strong><br>`;
+      if (windows.length === 0) {
+        html += `<span style="color:#94A3B8">Poor solar day — grid use likely</span>`;
+      } else {
+        const w      = windows[0];
+        const rating = windowRating(w.avgSurplus, app.kw);
+        html += `<span style="color:${rating.color}">⭐ Best window: ${fmtHour(w.startH)}–${fmtHour(w.endH)} ${rating.label}</span>`;
+      }
+      html += `</div>`;
+    });
+
+    // Timer validation for tomorrow
+    APPLIANCES.timers.forEach(timer => {
+      const result = checkTimerAlignment(tmrSolar, timer);
+      if (!result) return;
+      const color   = result.coverage > 0.8 ? '#10B981' : result.coverage > 0.5 ? '#F59E0B' : '#EF4444';
+      const verdict = result.coverage > 0.8 ? '✅ Well aligned' :
+                      result.coverage > 0.5 ? '🟡 Partially covered' :
+                      '⚠️ Mostly grid — consider timer adjustment';
+      html += `<div class="insight-item">${timer.icon} <strong>${timer.name}</strong> ${timer.label}: <span style="color:${color}">${verdict}</span></div>`;
+    });
+  }
+
+  document.getElementById('loadShiftContent').innerHTML = html;
+  document.getElementById('loadShiftStatus').textContent =
+    `Updated ${now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
 async function init() {
   let loaded = false;
 
@@ -2344,9 +2619,10 @@ async function init() {
   todayData = [...DATA];
   loadPeriodData();
 
-  // Always load billing and weather
+  // Always load billing, weather and load shifting
   loadMonthlyBilling();
-  loadWeather();
+  loadWeather().then(() => renderLoadShifting());
+  renderLoadShifting(); // initial render with today's data before weather arrives
 }
 
 init();
