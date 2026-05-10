@@ -150,7 +150,7 @@
   /* KPI CARDS */
   .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     gap: 10px;
     margin-bottom: 20px;
   }
@@ -533,7 +533,6 @@
 
   @media (max-width: 1100px) {
     .kpi-grid { grid-template-columns: repeat(4, 1fr); }
-    .upload-banner { grid-template-columns: 1fr; }
     .upload-banner-left { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 12px; }
     .weather-panel { padding-left: 0; padding-top: 12px; }
   }
@@ -767,20 +766,66 @@
   </div>
 
   <!-- INSIGHTS -->
+  <!-- KEY INSIGHTS -->
   <div class="insights-card" style="margin-top:20px">
-    <div class="insights-title">📊 Key Insights</div>
-    <div id="insightsPanel"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleInsights()">
+      <div class="insights-title" style="margin-bottom:0">📊 Key Insights</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.7rem;color:#475569" id="insightsHint">tap to expand</span>
+        <div id="insightsArrow" style="
+          width:28px;height:28px;
+          border-radius:50%;
+          background:rgba(255,255,255,0.06);
+          border:1px solid var(--border);
+          display:flex;align-items:center;justify-content:center;
+          font-size:0.9rem;
+          transition:transform 0.3s ease;
+          flex-shrink:0;
+        ">ℹ️</div>
+      </div>
+    </div>
+    <div id="insightsBody" style="
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 0.4s ease, opacity 0.3s ease;
+      opacity:0;
+    ">
+      <div id="insightsPanel" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);"></div>
+    </div>
   </div>
 
   <!-- LOAD SHIFTING -->
   <div class="insights-card" style="margin-top:16px" id="loadShiftPanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <div class="insights-title" style="margin-bottom:0">⚡ Load Shifting Recommendations</div>
-      <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleLoadShift()">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="insights-title" style="margin-bottom:0">⚡ Load Shifting Recommendations</div>
+        <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.7rem;color:#475569" id="loadShiftHint">tap to expand</span>
+        <div id="loadShiftArrow" style="
+          width:28px;height:28px;
+          border-radius:50%;
+          background:rgba(255,255,255,0.06);
+          border:1px solid var(--border);
+          display:flex;align-items:center;justify-content:center;
+          font-size:0.9rem;
+          transition:transform 0.3s ease;
+          flex-shrink:0;
+        ">ℹ️</div>
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" id="loadShiftContent">
-      <div id="loadShiftToday"></div>
-      <div id="loadShiftTomorrow"></div>
+    <div id="loadShiftBody" style="
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 0.4s ease, opacity 0.3s ease, margin-top 0.3s ease;
+      opacity:0;
+      margin-top:0;
+    ">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);" id="loadShiftContent">
+        <div id="loadShiftToday"></div>
+        <div id="loadShiftTomorrow"></div>
+      </div>
     </div>
   </div>
 
@@ -1507,14 +1552,18 @@ function computeKPIs() {
 
 function renderKPIs() {
   const k = computeKPIs();
+  const co2Avoided = k.totalPV * 0.928; // SA grid: 0.928 kg CO₂/kWh
+  const kmEquiv    = Math.round(co2Avoided / 0.16);
+
   const cards = [
-    { icon: '⚡', label: 'Peak PV Output', value: k.peakPV.toFixed(2), unit: 'kW', sub: 'max across all readings', accent: '#F59E0B' },
-    { icon: '☀️', label: 'Total PV Energy', value: k.totalPV.toFixed(1), unit: 'kWh', sub: 'solar harvest today', accent: '#F97316' },
-    { icon: '🏠', label: 'Total Consumption', value: k.totalCons.toFixed(1), unit: 'kWh', sub: 'home energy used', accent: '#3B82F6' },
-    { icon: '🔋', label: 'Battery SOC', value: k.currentSOC, unit: '%', sub: 'current state of charge', accent: '#10B981' },
-    { icon: '📊', label: 'SOC Range', value: `${k.minSOC}–${k.maxSOC}`, unit: '%', sub: 'min → max today', accent: '#8B5CF6' },
-    { icon: '🔌', label: 'Total Grid Input', value: k.totalGrid.toFixed(2), unit: 'kWh', sub: 'imported from grid today', accent: '#EF4444' },
-    { icon: '🌐', label: 'Grid Independence', value: k.gridIndep.toFixed(1), unit: '%', sub: 'of energy from solar+battery', accent: '#14B8A6' },
+    { icon: '⚡', label: 'Peak PV Output',    value: k.peakPV.toFixed(2),      unit: 'kW',  sub: 'max across all readings',       accent: '#F59E0B' },
+    { icon: '☀️', label: 'Total PV Energy',   value: k.totalPV.toFixed(1),      unit: 'kWh', sub: 'solar harvest today',            accent: '#F97316' },
+    { icon: '🏠', label: 'Total Consumption', value: k.totalCons.toFixed(1),    unit: 'kWh', sub: 'home energy used',               accent: '#3B82F6' },
+    { icon: '🔋', label: 'Battery SOC',        value: k.currentSOC,             unit: '%',   sub: 'current state of charge',        accent: '#10B981' },
+    { icon: '📊', label: 'SOC Range',          value: `${k.minSOC}–${k.maxSOC}`,unit: '%',   sub: 'min → max today',                accent: '#8B5CF6' },
+    { icon: '🔌', label: 'Total Grid Input',   value: k.totalGrid.toFixed(2),   unit: 'kWh', sub: 'imported from grid today',       accent: '#EF4444' },
+    { icon: '🌐', label: 'Grid Independence',  value: k.gridIndep.toFixed(1),   unit: '%',   sub: 'of energy from solar+battery',   accent: '#14B8A6' },
+    { icon: '♻️', label: 'CO₂ Avoided',        value: co2Avoided.toFixed(1),    unit: 'kg',  sub: `≈ ${kmEquiv} km not driven`,     accent: '#22C55E' },
   ];
   document.getElementById('kpiGrid').innerHTML = cards.map(c => `
     <div class="kpi-card" style="--accent:${c.accent}">
@@ -1869,6 +1918,10 @@ function renderInsights() {
     `🌙 During night hours (00:00–06:00), the battery supplied <b>${nightBatKwh.toFixed(2)} kWh</b> to cover home load.`,
   ];
   document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
+  if (insightsOpen) {
+    const body = document.getElementById('insightsBody');
+    body.style.maxHeight = body.scrollHeight + 300 + 'px';
+  }
 }
 
 function renderAggregatedInsights(pd) {
@@ -1926,6 +1979,10 @@ function renderAggregatedInsights(pd) {
     `💰 Estimated grid cost for the period: <b>${formatRand(cost)}</b>. Estimated saving vs all-grid: <b>${formatRand(saving)}</b> (VAT incl · ${getTiers(now.getMonth()+1) === TARIFF.summer ? 'Summer' : 'Winter'} rates).`,
   ];
   document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
+  if (insightsOpen) {
+    const body = document.getElementById('insightsBody');
+    body.style.maxHeight = body.scrollHeight + 300 + 'px';
+  }
 }
 
 // ============================================================
@@ -2315,6 +2372,48 @@ function renderWeather() {
 
 
 // ============================================================
+// ACCORDION TOGGLES
+// ============================================================
+let loadShiftOpen = false;
+let insightsOpen  = false;
+
+function toggleLoadShift() {
+  loadShiftOpen = !loadShiftOpen;
+  const body  = document.getElementById('loadShiftBody');
+  const arrow = document.getElementById('loadShiftArrow');
+  const hint  = document.getElementById('loadShiftHint');
+  if (loadShiftOpen) {
+    body.style.maxHeight = body.scrollHeight + 500 + 'px';
+    body.style.opacity   = '1';
+    arrow.innerHTML      = '⬆️';
+    hint.textContent     = 'tap to collapse';
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.innerHTML      = 'ℹ️';
+    hint.textContent     = 'tap to expand';
+  }
+}
+
+function toggleInsights() {
+  insightsOpen = !insightsOpen;
+  const body  = document.getElementById('insightsBody');
+  const arrow = document.getElementById('insightsArrow');
+  const hint  = document.getElementById('insightsHint');
+  if (insightsOpen) {
+    body.style.maxHeight = body.scrollHeight + 300 + 'px';
+    body.style.opacity   = '1';
+    arrow.innerHTML      = '⬆️';
+    hint.textContent     = 'tap to collapse';
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.innerHTML      = 'ℹ️';
+    hint.textContent     = 'tap to expand';
+  }
+}
+
+// ============================================================
 // LOAD SHIFTING ENGINE
 // ============================================================
 
@@ -2599,6 +2698,12 @@ async function renderLoadShifting() {
   document.getElementById('loadShiftTomorrow').innerHTML = right;
   document.getElementById('loadShiftStatus').textContent =
     `Updated ${now.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}`;
+
+  // If accordion is open, recalculate max-height to fit new content
+  if (loadShiftOpen) {
+    const body = document.getElementById('loadShiftBody');
+    body.style.maxHeight = body.scrollHeight + 200 + 'px';
+  }
 }
 
 async function init() {
