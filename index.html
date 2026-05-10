@@ -552,6 +552,7 @@
     .header-cost { padding: 6px 12px; }
     .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
     #loadShiftContent { grid-template-columns: 1fr !important; }
+    .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
     .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
@@ -835,7 +836,7 @@
       <div class="insights-title" style="margin-bottom:0">💰 Monthly Grid Cost Estimate</div>
       <div style="font-size:0.72rem;color:var(--muted)" id="billingStatus">Loading monthly data…</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px" id="billingKpis"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px" class="billing-kpi-grid" id="billingKpis"></div>
     <div style="background:#0F172A;border-radius:8px;padding:14px 16px" id="billingBreakdown"></div>
   </div>
 
