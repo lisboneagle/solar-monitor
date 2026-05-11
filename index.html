@@ -618,8 +618,7 @@
 <!-- GAUGE BAR -->
 <div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px 14px;">
   <div class="insights-title gauge-title" style="margin-bottom:10px;">⚡ System Health Status</div>
-  <div style="display:flex;align-items:center;justify-content:center;">
-    <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
+  <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
     <div class="gauge-label-row" style="justify-content:center;margin-bottom:4px;">
       <span id="gaugeIcon">🟢</span>
       <span id="gaugeText" style="color:#10B981">System Optimal</span>
@@ -636,7 +635,6 @@
       <span>Optimal</span>
     </div>
   </div>
-  </div>
 </div>
 
 <!-- WEATHER SECTION -->
@@ -648,8 +646,8 @@
     <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
   </div>
 
-  <!-- Main row: two bordered bubbles side by side -->
-  <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
+  <!-- Main row: two bordered bubbles side by side, centred -->
+  <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;justify-content:center;">
 
     <!-- BUBBLE 1: Solar info chips — same size as wx-day cards, aligned to top -->
     <div style="
@@ -1304,7 +1302,7 @@ async function loadPeriodData() {
     // Day view
     if (currentPeriod === 'day') {
       const dayKey = dateToKey(range.start);
-      document.getElementById('periodNoteText').textContent = '5-minute interval data';
+      
 
       if (dayKey === todayKey) {
         // Restore today's live data if we navigated away
@@ -1353,8 +1351,6 @@ async function loadPeriodData() {
 
     // Week / Month / Year — aggregate
     const dates = getDatesInRange(range.start, range.end);
-    document.getElementById('periodNoteText').textContent =
-      `Aggregated from ${dates.length} day${dates.length !== 1 ? 's' : ''} · per ${currentPeriod === 'year' ? 'month' : 'day'}`;
 
     const fetches = dates.map(dk =>
       fetch(`data/${dk}.json`, { cache: 'no-store' })
