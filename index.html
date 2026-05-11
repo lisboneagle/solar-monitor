@@ -182,14 +182,14 @@
     padding: 16px 20px;
     margin-bottom: 20px;
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
+    flex-direction: column;
+    gap: 12px;
     align-items: center;
   }
-  .ctrl-group { display: flex; flex-direction: column; gap: 6px; }
-  .ctrl-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
-  .ctrl-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
-  .slider-container { position: relative; width: 220px; height: 24px; }
+  .ctrl-group { display: flex; flex-direction: column; gap: 6px; align-items: center; width: 100%; }
+  .ctrl-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; text-align: center; }
+  .ctrl-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+  .slider-container { position: relative; width: 400px; max-width: 100%; height: 24px; }
   .slider-container input[type=range] {
     position: absolute;
     width: 100%;
@@ -665,18 +665,17 @@
 
     <!-- BUBBLE 2: Forecast day cards + tabs underneath -->
     <div style="
-      flex:1;
+      flex:0 0 auto;
       border:1px solid var(--border);
       border-radius:10px;
       padding:10px 12px;
       background:rgba(255,255,255,0.02);
-      min-width:0;
-      display:flex;
+      display:inline-flex;
       flex-direction:column;
       gap:8px;
     ">
       <!-- Day cards -->
-      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;">
+      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;width:auto;">
         <div class="wx-loading">📡 Fetching forecast…</div>
       </div>
       <!-- Tabs below day cards, left-aligned inside the bubble -->
@@ -706,7 +705,7 @@
 <div class="main">
 
   <!-- PERIOD FILTER -->
-  <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px;justify-content:center;">
+  <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px;flex-direction:row !important;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px;">
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
