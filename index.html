@@ -224,18 +224,20 @@
   }
   .slider-time { font-size: 0.78rem; color: var(--text); font-weight: 500; min-width: 40px; text-align: center; }
   .toggle-btn {
-    background: var(--border);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 5px 12px;
+    background: #1E293B;
+    border: 1px solid #334155;
+    color: #94A3B8;
+    padding: 4px 14px;
     border-radius: 6px;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     cursor: pointer;
     transition: all 0.15s;
     font-family: inherit;
     white-space: nowrap;
+    letter-spacing: 0.2px;
   }
-  .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .toggle-btn:hover { background: #263548; border-color: #475569; color: #F1F5F9; }
+  .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 0 0 1px rgba(59,130,246,0.3); }
   .cb-group { display: flex; gap: 8px; flex-wrap: wrap; }
   .cb-item { display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .cb-item input[type=checkbox] { accent-color: var(--blue); width: 14px; height: 14px; cursor: pointer; }
@@ -531,7 +533,7 @@
   }
   .apply-btn:hover { opacity: 0.85; }
 
-  .gauge-title { text-align: left; }
+  .gauge-title { text-align: center; }
 
   @media (max-width: 1100px) {
     .kpi-grid { grid-template-columns: repeat(4, 1fr); }
@@ -616,8 +618,8 @@
 </div>
 
 <!-- GAUGE BAR -->
-<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px 14px;">
-  <div class="insights-title gauge-title" style="margin-bottom:10px;">⚡ System Health Status</div>
+<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px 14px;display:flex;flex-direction:column;align-items:center;">
+  <div class="insights-title gauge-title" style="margin-bottom:10px;text-align:center;">⚡ System Health Status</div>
   <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
     <div class="gauge-label-row" style="justify-content:center;margin-bottom:4px;">
       <span id="gaugeIcon">🟢</span>
@@ -641,7 +643,7 @@
 <div style="background:linear-gradient(135deg,#0A1628 0%,#0F2744 100%);border-bottom:1px solid var(--border);padding:14px 28px;overflow:hidden;">
 
   <!-- Title + location -->
-  <div style="margin-bottom:10px;">
+  <div style="margin-bottom:10px;text-align:center;">
     <div class="insights-title" style="margin-bottom:2px;">🌤 Weather &amp; Solar Forecast</div>
     <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
   </div>
@@ -2429,9 +2431,9 @@ function renderSolarInfoBar() {
   }
 
   const chips = [
-    { icon: '🌅', label: 'Sunrise',    value: sunrise,    sub: azSunrise !== '—' ? `Az ${azSunrise}` : '' },
+    { icon: '🌅', label: 'Sunrise',    value: sunrise,    sub: azSunrise !== '—' ? azSunrise : '' },
     { icon: '🌞', label: 'Solar Noon', value: solarNoon,  sub: 'Peak intensity' },
-    { icon: '🌇', label: 'Sunset',     value: sunset,     sub: azSunset !== '—' ? `Az ${azSunset}` : '' },
+    { icon: '🌇', label: 'Sunset',     value: sunset,     sub: azSunset !== '—' ? azSunset : '' },
     { icon: '⏱',  label: 'Daylight',   value: daylightStr,sub: 'Total duration' },
   ];
 
