@@ -227,7 +227,7 @@
     background: #1E293B;
     border: 1px solid #334155;
     color: #94A3B8;
-    padding: 2px 8px;
+    padding: 2px 12px;
     border-radius: 4px;
     font-size: 0.62rem;
     cursor: pointer;
@@ -237,6 +237,7 @@
     letter-spacing: 0.2px;
     height: 22px;
     line-height: 1;
+    min-width: 48px;
   }
   .toggle-btn:hover { background: #263548; border-color: #475569; color: #F1F5F9; }
   .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 0 0 1px rgba(59,130,246,0.3); }
@@ -645,14 +646,14 @@
 <div style="background:linear-gradient(135deg,#0A1628 0%,#0F2744 100%);border-bottom:1px solid var(--border);padding:14px 28px;overflow:hidden;">
 
   <!-- Title + location -->
-  <div style="margin-bottom:10px;text-align:center;">
-    <div class="insights-title" style="margin-bottom:2px;">🌤 Weather &amp; Solar Forecast</div>
+  <div style="margin-bottom:16px;text-align:center;">
+    <div class="insights-title" style="margin-bottom:4px;">🌤 Weather &amp; Solar Forecast</div>
     <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
   </div>
 
-  <!-- Main row: two bordered bubbles, centred with max-width wrapper -->
-  <div style="display:flex;justify-content:center;">
-    <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;width:100%;max-width:900px;">
+  <!-- Main row: two bordered bubbles, centred -->
+  <div style="display:flex;justify-content:center;width:100%;">
+    <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;width:fit-content;max-width:100%;">
 
     <!-- BUBBLE 1: Solar info chips — same size as wx-day cards, aligned to top -->
     <div style="
@@ -713,19 +714,19 @@
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
-        <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')"   style="flex:1;text-align:center">Day</button>
-        <button class="toggle-btn"        id="pWeek"  onclick="setPeriod('week')"  style="flex:1;text-align:center">Week</button>
-        <button class="toggle-btn"        id="pMonth" onclick="setPeriod('month')" style="flex:1;text-align:center">Month</button>
-        <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')"  style="flex:1;text-align:center">Year</button>
+        <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')"   style="">Day</button>
+        <button class="toggle-btn"        id="pWeek"  onclick="setPeriod('week')"  style="">Week</button>
+        <button class="toggle-btn"        id="pMonth" onclick="setPeriod('month')" style="">Month</button>
+        <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')"  style="">Year</button>
       </div>
     </div>
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
       <div class="ctrl-label">Navigate Day</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" onclick="shiftPeriod(-1)" style="flex:1;text-align:center;white-space:nowrap">◀ Prev</button>
+        <button class="toggle-btn" onclick="shiftPeriod(-1)" style="white-space:nowrap">◀ Prev</button>
         <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:60px;text-align:center;white-space:nowrap">Today</span>
-        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="flex:1;text-align:center;white-space:nowrap">Next ▶</button>
-        <button class="toggle-btn" onclick="resetPeriod()" style="flex:1;text-align:center;white-space:nowrap;font-size:0.72rem">↺ Reset</button>
+        <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="white-space:nowrap">Next ▶</button>
+        <button class="toggle-btn" onclick="resetPeriod()" style="white-space:nowrap">↺ Reset</button>
       </div>
     </div>
   </div>
@@ -760,20 +761,20 @@
     <div class="ctrl-group">
       <div class="ctrl-label">Chart Style</div>
       <div class="ctrl-row">
-        <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')" style="flex:1;text-align:center">Line</button>
-        <button class="toggle-btn" id="btnArea" onclick="setChartType('area')" style="flex:1;text-align:center">Area</button>
+        <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')" style="">Line</button>
+        <button class="toggle-btn" id="btnArea" onclick="setChartType('area')" style="">Area</button>
       </div>
     </div>
     <div class="ctrl-group">
       <div class="ctrl-label">Smoothing</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()" style="flex:1;text-align:center">5-pt Rolling Avg</button>
+        <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()" style="">5-pt Rolling Avg</button>
       </div>
     </div>
     <div class="ctrl-group">
       <div class="ctrl-label">Reset</div>
       <div class="ctrl-row">
-        <button class="toggle-btn" onclick="resetFilters()" style="flex:1;text-align:center">Reset All</button>
+        <button class="toggle-btn" onclick="resetFilters()" style="">Reset All</button>
       </div>
     </div>
   </div>
