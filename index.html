@@ -608,8 +608,8 @@
 </div>
 
 <!-- GAUGE BAR -->
-<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px 12px;">
-  <div style="font-size:0.68rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:8px;">⚡ System Health Status</div>
+<div style="background:linear-gradient(135deg,#0F172A 0%,#1E293B 100%);border-bottom:1px solid var(--border);padding:10px 28px 14px;">
+  <div class="insights-title" style="text-align:center;margin-bottom:10px;">⚡ System Health Status</div>
   <div style="display:flex;align-items:center;justify-content:center;">
     <div class="status-gauge" id="statusGauge" style="width:100%;max-width:480px;">
     <div class="gauge-label-row" style="justify-content:center;margin-bottom:4px;">
@@ -631,42 +631,31 @@
   </div>
 </div>
 
-<!-- UPLOAD BANNER -->
-<div class="upload-banner">
-  <div class="upload-banner-left">
-    <div class="upload-status-row">
-      <div class="upload-status idle" id="uploadStatus">⏳ Checking for latest data…</div>
-      <div class="upload-hint" id="uploadHint">Attempting to auto-load today's data from data/latest.json</div>
+<!-- WEATHER SECTION -->
+<div style="background:linear-gradient(135deg,#0A1628 0%,#0F2744 100%);border-bottom:1px solid var(--border);padding:14px 28px;">
+
+  <!-- Header row: title + tabs -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+    <div>
+      <div class="insights-title" style="margin-bottom:2px;">🌤 Weather &amp; Solar Forecast</div>
+      <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <div class="upload-drop-zone" id="dropZone" style="min-width:0;flex:1">
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this.files[0])">
-        <span class="upload-icon">⬆️</span>
-        <div class="upload-text"><strong>Upload</strong> .xlsx / .xls / .csv</div>
-      </div>
-    </div>
-    <div id="uploadOverrideHint" style="font-size:0.76rem;color:#F1F5F9;font-style:normal;font-weight:400;display:none;text-align:center;width:100%">Upload a file manually to override.</div>
-  </div>
-  <div class="weather-panel" id="weatherPanel">
-    <div class="weather-top">
-      <div style="flex:1"></div>
-      <div class="weather-tabs">
-        <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
-        <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
-        <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
-        <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
-      </div>
-    </div>
-    <div class="weather-days-wrapper">
-      <div class="weather-label-group">
-        <span class="weather-label">🌤 7-Day Forecast</span>
-        <span class="weather-location" id="wxLocation">📍 Vereeniging, Gauteng</span>
-      </div>
-      <div class="weather-days" id="weatherDays">
-        <div class="wx-loading">📡 Fetching forecast…</div>
-      </div>
+    <div class="weather-tabs">
+      <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
+      <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
+      <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
+      <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
     </div>
   </div>
+
+  <!-- Solar info bar for today -->
+  <div id="solarInfoBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
+
+  <!-- 7-day forecast days -->
+  <div class="weather-days" id="weatherDays">
+    <div class="wx-loading">📡 Fetching forecast…</div>
+  </div>
+
 </div>
 
 <!-- COLUMN MAPPER (shown after upload if columns don't auto-detect) -->
@@ -842,6 +831,38 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px" class="billing-kpi-grid" id="billingKpis"></div>
     <div style="background:#0F172A;border-radius:8px;padding:14px 16px" id="billingBreakdown"></div>
+  </div>
+
+  <!-- SYSTEM DATA INPUT -->
+  <div class="insights-card" style="margin-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleDataInput()">
+      <div class="insights-title" style="margin-bottom:0">📂 System Data Input</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.7rem;color:#475569" id="dataInputHint">tap to expand</span>
+        <div id="dataInputArrow" style="
+          width:28px;height:28px;border-radius:50%;
+          background:rgba(255,255,255,0.06);
+          border:1px solid var(--border);
+          display:flex;align-items:center;justify-content:center;
+          font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
+      </div>
+    </div>
+    <div id="dataInputBody" style="max-height:0;overflow:hidden;transition:max-height 0.4s ease,opacity 0.3s ease;opacity:0;">
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="upload-status-row" style="margin-bottom:10px;">
+          <div class="upload-status idle" id="uploadStatus">⏳ Checking for latest data…</div>
+          <div class="upload-hint" id="uploadHint" style="margin-top:4px;">Attempting to auto-load today's data from data/latest.json</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div class="upload-drop-zone" id="dropZone" style="min-width:0;flex:1">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileUpload(this.files[0])">
+            <span class="upload-icon">⬆️</span>
+            <div class="upload-text"><strong>Upload</strong> .xlsx / .xls / .csv</div>
+          </div>
+        </div>
+        <div id="uploadOverrideHint" style="font-size:0.76rem;color:#F1F5F9;display:none;text-align:center;width:100%">Upload a file manually to override.</div>
+      </div>
+    </div>
   </div>
 
   <!-- SOURCES FOOTER -->
@@ -2315,7 +2336,7 @@ async function loadWeather() {  const lat = -26.7413, lon = 27.8498;
 
   // Fetch forecast
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max,sunrise,sunset` +
+    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max,sunrise,sunset,sunshine_duration` +
     `&timezone=Africa%2FJohannesburg&forecast_days=7`;
   try {
     const resp = await fetch(url);
@@ -2336,8 +2357,74 @@ function setWxTab(tab) {
   renderWeather();
 }
 
+function renderSolarInfoBar() {
+  if (!wxData || !wxData.daily) return;
+  const d        = wxData.daily;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const idx      = d.time.indexOf(todayStr);
+  if (idx < 0) return;
+
+  const fmtSolarTime = iso => {
+    const dt = new Date(iso);
+    return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  };
+
+  const sunrise   = d.sunrise?.[idx]  ? fmtSolarTime(d.sunrise[idx])  : '—';
+  const sunset    = d.sunset?.[idx]   ? fmtSolarTime(d.sunset[idx])   : '—';
+
+  // Solar noon = midpoint between sunrise and sunset
+  let solarNoon = '—', daylightStr = '—', azSunrise = '—', azSunset = '—';
+  if (d.sunrise?.[idx] && d.sunset?.[idx]) {
+    const srMs  = new Date(d.sunrise[idx]).getTime();
+    const ssMs  = new Date(d.sunset[idx]).getTime();
+    const noon  = new Date((srMs + ssMs) / 2);
+    solarNoon   = `${String(noon.getHours()).padStart(2,'0')}:${String(noon.getMinutes()).padStart(2,'0')}`;
+
+    const daylightSec = (ssMs - srMs) / 1000;
+    const dh = Math.floor(daylightSec / 3600);
+    const dm = Math.round((daylightSec % 3600) / 60);
+    daylightStr = `${dh}h ${dm}m`;
+
+    // Approximate azimuth for Vereeniging lat=-26.74° in May
+    // Sunrise ~ENE (~70°), Sunset ~WNW (~290°) in autumn
+    // We compute roughly using declination for the date
+    const dayOfYear = Math.floor((new Date(todayStr) - new Date(new Date(todayStr).getFullYear(), 0, 0)) / 86400000);
+    const decl = -23.45 * Math.cos((360 / 365) * (dayOfYear + 10) * Math.PI / 180);
+    const lat  = -26.7413;
+    const cosAz = Math.sin(decl * Math.PI / 180) / Math.cos(lat * Math.PI / 180);
+    const azDeg = Math.round(Math.acos(Math.max(-1, Math.min(1, cosAz))) * 180 / Math.PI);
+    azSunrise = `~${azDeg}° (${azDeg < 90 ? 'NE' : azDeg < 110 ? 'ENE' : 'E'})`;
+    azSunset  = `~${360 - azDeg}° (${360 - azDeg > 270 ? 'NW' : 360 - azDeg > 250 ? 'WNW' : 'W'})`;
+  }
+
+  const chips = [
+    { icon: '🌅', label: 'Sunrise',       value: sunrise,    sub: azSunrise !== '—' ? `Az ${azSunrise}` : '' },
+    { icon: '🌞', label: 'Solar Noon',    value: solarNoon,  sub: 'Peak intensity' },
+    { icon: '🌇', label: 'Sunset',        value: sunset,     sub: azSunset !== '—' ? `Az ${azSunset}` : '' },
+    { icon: '⏱',  label: 'Daylight',      value: daylightStr,sub: 'Total duration' },
+    { icon: '🔆', label: 'Peak UV',       value: d.uv_index_max?.[idx]?.toFixed(1) ?? '—', sub: 'UV Index today' },
+  ];
+
+  document.getElementById('solarInfoBar').innerHTML = chips.map(c => `
+    <div style="
+      background:rgba(255,255,255,0.04);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:6px 12px;
+      flex:1;
+      min-width:80px;
+      text-align:center;
+    ">
+      <div style="font-size:1rem;margin-bottom:2px">${c.icon}</div>
+      <div style="font-size:0.62rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600">${c.label}</div>
+      <div style="font-size:0.88rem;font-weight:700;color:#F1F5F9">${c.value}</div>
+      ${c.sub ? `<div style="font-size:0.58rem;color:#475569">${c.sub}</div>` : ''}
+    </div>`).join('');
+}
+
 function renderWeather() {
   if (!wxData) return;
+  renderSolarInfoBar();
   const d = wxData.daily;
   const today = new Date().toISOString().slice(0, 10);
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -2425,6 +2512,25 @@ function toggleInsights() {
   const hint  = document.getElementById('insightsHint');
   if (insightsOpen) {
     body.style.maxHeight = body.scrollHeight + 300 + 'px';
+    body.style.opacity   = '1';
+    arrow.innerHTML      = '⬆️';
+    hint.textContent     = 'tap to collapse';
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.innerHTML      = 'ℹ️';
+    hint.textContent     = 'tap to expand';
+  }
+}
+
+let dataInputOpen = false;
+function toggleDataInput() {
+  dataInputOpen = !dataInputOpen;
+  const body  = document.getElementById('dataInputBody');
+  const arrow = document.getElementById('dataInputArrow');
+  const hint  = document.getElementById('dataInputHint');
+  if (dataInputOpen) {
+    body.style.maxHeight = body.scrollHeight + 200 + 'px';
     body.style.opacity   = '1';
     arrow.innerHTML      = '⬆️';
     hint.textContent     = 'tap to collapse';
@@ -2756,6 +2862,8 @@ async function init() {
           `Live data loaded from data/latest.json (${rows.length} readings).`;
         const overrideHint = document.getElementById("uploadOverrideHint");
         if (overrideHint) overrideHint.style.display = 'block';
+        // Update the data input panel hint text to show loaded status
+        document.getElementById('dataInputHint').textContent = `✅ ${dateLabel} | ${loadTime}`;
         loaded = true;
       }
     }
