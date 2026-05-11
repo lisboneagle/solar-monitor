@@ -227,14 +227,16 @@
     background: #1E293B;
     border: 1px solid #334155;
     color: #94A3B8;
-    padding: 4px 14px;
-    border-radius: 6px;
-    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.62rem;
     cursor: pointer;
     transition: all 0.15s;
     font-family: inherit;
     white-space: nowrap;
     letter-spacing: 0.2px;
+    height: 22px;
+    line-height: 1;
   }
   .toggle-btn:hover { background: #263548; border-color: #475569; color: #F1F5F9; }
   .toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 0 0 1px rgba(59,130,246,0.3); }
@@ -564,7 +566,7 @@
     .gauge-title { text-align: center !important; }
     /* Fix weather section padding on mobile */
     #weatherMainRow > div { width: 100% !important; box-sizing: border-box !important; }
-    .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
+    .toggle-btn { padding: 2px 6px; font-size: 0.58rem; height: 20px; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
@@ -708,7 +710,7 @@
 
   <!-- PERIOD FILTER -->
   <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px;flex-direction:row !important;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px;">
-    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
+    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
         <button class="toggle-btn active" id="pDay"   onclick="setPeriod('day')"   style="flex:1;text-align:center">Day</button>
@@ -717,7 +719,7 @@
         <button class="toggle-btn"        id="pYear"  onclick="setPeriod('year')"  style="flex:1;text-align:center">Year</button>
       </div>
     </div>
-    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
+    <div class="ctrl-group" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;">
       <div class="ctrl-label">Navigate Day</div>
       <div class="ctrl-row">
         <button class="toggle-btn" onclick="shiftPeriod(-1)" style="flex:1;text-align:center;white-space:nowrap">◀ Prev</button>
