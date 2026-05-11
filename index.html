@@ -556,7 +556,7 @@
     .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    #weatherMainRow { flex-direction: column !important; }
+    #weatherMainRow { flex-direction: column !important; max-width: 100% !important; }
     #solarInfoBar { flex-wrap: nowrap !important; justify-content: stretch; }
     #solarInfoBar > div { flex: 1 !important; width: auto !important; min-width: 0 !important; }
     .gauge-title { text-align: center !important; }
@@ -646,8 +646,9 @@
     <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
   </div>
 
-  <!-- Main row: two bordered bubbles side by side, centred -->
-  <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;justify-content:center;">
+  <!-- Main row: two bordered bubbles, centred with max-width wrapper -->
+  <div style="display:flex;justify-content:center;">
+    <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;width:100%;max-width:900px;">
 
     <!-- BUBBLE 1: Solar info chips — same size as wx-day cards, aligned to top -->
     <div style="
@@ -689,7 +690,8 @@
       </div>
     </div>
 
-  </div>
+  </div><!-- end weatherMainRow -->
+  </div><!-- end centering wrapper -->
 
 </div>
 
