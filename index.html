@@ -645,7 +645,7 @@
   <!-- Main row: two bordered bubbles side by side -->
   <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
 
-    <!-- BUBBLE 1: Solar info chips — same size as wx-day cards -->
+    <!-- BUBBLE 1: Solar info chips — same size as wx-day cards, aligned to top -->
     <div style="
       border:1px solid var(--border);
       border-radius:10px;
@@ -655,7 +655,7 @@
       display:flex;
       flex-direction:row;
       gap:6px;
-      align-items:center;
+      align-items:flex-start;
     " id="solarInfoBar"></div>
 
     <!-- BUBBLE 2: Forecast day cards + tabs underneath -->
@@ -674,8 +674,8 @@
       <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;">
         <div class="wx-loading">📡 Fetching forecast…</div>
       </div>
-      <!-- Tabs below day cards, inside the bubble -->
-      <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px;">
+      <!-- Tabs below day cards, left-aligned inside the bubble -->
+      <div style="display:flex;justify-content:flex-start;border-top:1px solid var(--border);padding-top:8px;">
         <div class="weather-tabs">
           <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
           <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
