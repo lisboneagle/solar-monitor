@@ -140,7 +140,7 @@
     justify-content: space-between;
     width: 100%;
     font-size: 0.55rem;
-    color: #475569;
+    color: #64748B;
     margin-top: 1px;
   }
 
@@ -777,21 +777,20 @@
       <div class="ctrl-label">Series</div>
       <div class="cb-group" id="seriesToggle"></div>
     </div>
-    <div class="ctrl-group">
+    <div class="ctrl-group" style="margin-top:8px;">
       <div class="ctrl-label">Chart Style</div>
       <div class="ctrl-row">
         <button class="toggle-btn active" id="btnLine" onclick="setChartType('line')" style="">Line</button>
         <button class="toggle-btn" id="btnArea" onclick="setChartType('area')" style="">Area</button>
       </div>
     </div>
-    <div class="ctrl-group">
+    <div class="ctrl-group" style="margin-top:8px;">
       <div class="ctrl-label">Smoothing</div>
       <div class="ctrl-row">
         <button class="toggle-btn" id="btnSmooth" onclick="toggleSmooth()" style="">5-pt Rolling Avg</button>
       </div>
     </div>
-    <div class="ctrl-group">
-      <div class="ctrl-label">Reset</div>
+    <div class="ctrl-group" style="margin-top:8px;">
       <div class="ctrl-row">
         <button class="toggle-btn" onclick="resetFilters()" style="">Reset All</button>
       </div>
@@ -2303,7 +2302,7 @@ async function loadMonthlyBilling() {
       projected saving <strong style="color:#A78BFA">${formatRand(projSavingsCents)}</strong> ·
       VAT incl · ${seasonLabel} rates
     </div>
-    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #1E293B;font-size:0.68rem;color:#334155">
+    <div style="margin-top:12px;padding-top:10px;border-top:1px dashed #1E293B;font-size:0.68rem;color:#64748B">
       Savings are estimated by comparing actual grid import cost against the cost if all consumption were sourced from the grid at the applicable tiered tariff. Projections assume remaining days mirror the recorded daily average. Values are indicative only.
     </div>`;
 
