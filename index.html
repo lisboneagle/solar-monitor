@@ -554,7 +554,8 @@
     .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
-    #solarInfoBar { flex-direction: row !important; flex-wrap: wrap !important; min-width: 0 !important; width: 100% !important; }
+    #weatherMainRow { flex-direction: column !important; }
+    #solarInfoBar { flex-wrap: wrap !important; justify-content: space-between; }
     .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
@@ -641,48 +642,50 @@
     <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
   </div>
 
-  <!-- Main row: solar info + forecast cards side by side -->
-  <div style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
+  <!-- Main row: two bordered bubbles side by side -->
+  <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
 
-    <!-- Solar info panel -->
-    <div id="solarInfoBar" style="
-      display:flex;
-      flex-direction:column;
-      gap:6px;
+    <!-- BUBBLE 1: Solar info chips horizontal -->
+    <div style="
       border:1px solid var(--border);
       border-radius:10px;
-      padding:10px 12px;
+      padding:12px 14px;
       background:rgba(255,255,255,0.02);
       flex-shrink:0;
-      min-width:140px;
-      justify-content:space-between;
-    "></div>
+      display:flex;
+      flex-direction:row;
+      gap:10px;
+      align-items:center;
+      flex-wrap:nowrap;
+    " id="solarInfoBar"></div>
 
-    <!-- 7-day forecast panel -->
+    <!-- BUBBLE 2: Forecast tabs + day cards -->
     <div style="
       flex:1;
       border:1px solid var(--border);
       border-radius:10px;
-      padding:10px 12px;
+      padding:12px 14px;
       background:rgba(255,255,255,0.02);
       min-width:0;
-      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
     ">
-      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;">
+      <!-- Tabs inside the forecast bubble -->
+      <div style="display:flex;justify-content:flex-end;">
+        <div class="weather-tabs">
+          <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
+          <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
+          <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
+          <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
+        </div>
+      </div>
+      <!-- Day cards -->
+      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;">
         <div class="wx-loading">📡 Fetching forecast…</div>
       </div>
     </div>
 
-  </div>
-
-  <!-- Tab buttons below -->
-  <div style="display:flex;justify-content:flex-end;margin-top:10px;">
-    <div class="weather-tabs">
-      <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
-      <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
-      <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
-      <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
-    </div>
   </div>
 
 </div>
@@ -2437,20 +2440,20 @@ function renderSolarInfoBar() {
   document.getElementById('solarInfoBar').innerHTML = chips.map(c => `
     <div style="
       display:flex;
+      flex-direction:column;
       align-items:center;
-      gap:10px;
-      padding:5px 8px;
-      border-radius:6px;
+      text-align:center;
+      padding:6px 12px;
+      border-radius:8px;
       background:rgba(255,255,255,0.03);
-      border:1px solid rgba(255,255,255,0.06);
-      flex:1;
+      border:1px solid rgba(255,255,255,0.07);
+      min-width:80px;
+      flex-shrink:0;
     ">
-      <div style="font-size:1.1rem;flex-shrink:0">${c.icon}</div>
-      <div>
-        <div style="font-size:0.58rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600">${c.label}</div>
-        <div style="font-size:0.85rem;font-weight:700;color:#F1F5F9;line-height:1.2">${c.value}</div>
-        ${c.sub ? `<div style="font-size:0.58rem;color:#475569">${c.sub}</div>` : ''}
-      </div>
+      <div style="font-size:1.2rem;margin-bottom:3px">${c.icon}</div>
+      <div style="font-size:0.58rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px">${c.label}</div>
+      <div style="font-size:0.88rem;font-weight:700;color:#F1F5F9;line-height:1.2">${c.value}</div>
+      ${c.sub ? `<div style="font-size:0.58rem;color:#475569;margin-top:1px">${c.sub}</div>` : ''}
     </div>`).join('');
 }
 
