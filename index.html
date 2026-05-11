@@ -564,6 +564,9 @@
     .header-cost { padding: 6px 12px; }
     .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
     #loadShiftContent { grid-template-columns: 1fr !important; }
+    #loadShiftContent > div:nth-child(2) { width: 100% !important; height: 3px !important; margin: 8px 0 !important; background: var(--border) !important; border-left: none !important; border-right: none !important; border-top: 1px solid var(--border) !important; border-bottom: 1px solid var(--border) !important; }
+    #loadShiftToday { padding-right: 0 !important; }
+    #loadShiftTomorrow { padding-left: 0 !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
     #weatherMainRow { flex-direction: column !important; max-width: 100% !important; }
     #weatherMainRow > div { padding-bottom: 12px !important; width: 100% !important; box-sizing: border-box !important; }
@@ -840,8 +843,8 @@
 
   <!-- LOAD SHIFTING -->
   <div class="insights-card" style="margin-top:16px" id="loadShiftPanel">
-    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleLoadShift()">
-      <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleLoadShift()">
+      <div style="display:flex;flex-direction:column;gap:2px;">
         <div class="insights-title" style="margin-bottom:0">⚡ Load Shifting Recommendations</div>
         <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
       </div>
@@ -866,8 +869,18 @@
       opacity:0;
       margin-top:0;
     ">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);" id="loadShiftContent">
-        <div id="loadShiftToday"></div>
+      <div style="
+        display:grid;
+        grid-template-columns:1fr 3px 1fr;
+        gap:0 0;
+        margin-top:14px;
+        padding-top:14px;
+        border-top:1px solid var(--border);
+      " id="loadShiftContent">
+        <div id="loadShiftToday" style="padding-right:16px;"></div>
+        <!-- Vertical divider -->
+        <div style="background:var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);width:3px;margin:0 8px;"></div>
+        <div id="loadShiftTomorrow" style="padding-left:16px;"></div>
         <div id="loadShiftTomorrow"></div>
       </div>
     </div>
@@ -2767,7 +2780,7 @@ async function renderLoadShifting() {
   const todayWx    = wxData?.daily?.weathercode
     ? wxCodeInfo(wxData.daily.weathercode[wxData.daily.time.indexOf(now.toISOString().slice(0,10))] ?? 0)
     : { icon: '☀️' };
-  const todaySub   = todayCloud !== null ? ` · ${todayCloud}% cloud · ${todayEff}% eff` : '';
+  const todaySub   = todayCloud !== null ? ` · ${todayCloud}% cloud · ${todayEff}% efficiency` : '';
   left += sectionHead(`${todayWx.icon} Today — ${todayLabel}${todaySub}`);
 
   const hasFutureSolar = todaySolar.some((v, h) => h >= nowHour && v > 0.1);
@@ -2831,7 +2844,7 @@ async function renderLoadShifting() {
     const tmrCode  = wxData?.daily?.weathercode?.[wxData.daily.time.indexOf(tmrDate)] ?? 0;
     const tmrWx    = wxCodeInfo(tmrCode);
 
-    right += sectionHead(`${tmrWx.icon} Tomorrow — ${tmrLabel} · ${tmrCloud}% cloud · ${tmrEff}% eff`);
+    right += sectionHead(`${tmrWx.icon} Tomorrow — ${tmrLabel} · ${tmrCloud}% cloud · ${tmrEff}% efficiency`);
 
     const tmrCons = Array(24).fill(0.45);
 
