@@ -645,44 +645,43 @@
   <!-- Main row: two bordered bubbles side by side -->
   <div id="weatherMainRow" style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
 
-    <!-- BUBBLE 1: Solar info chips horizontal -->
+    <!-- BUBBLE 1: Solar info chips — same size as wx-day cards -->
     <div style="
       border:1px solid var(--border);
       border-radius:10px;
-      padding:12px 14px;
+      padding:10px 12px;
       background:rgba(255,255,255,0.02);
       flex-shrink:0;
       display:flex;
       flex-direction:row;
-      gap:10px;
+      gap:6px;
       align-items:center;
-      flex-wrap:nowrap;
     " id="solarInfoBar"></div>
 
-    <!-- BUBBLE 2: Forecast tabs + day cards -->
+    <!-- BUBBLE 2: Forecast day cards + tabs underneath -->
     <div style="
       flex:1;
       border:1px solid var(--border);
       border-radius:10px;
-      padding:12px 14px;
+      padding:10px 12px;
       background:rgba(255,255,255,0.02);
       min-width:0;
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:8px;
     ">
-      <!-- Tabs inside the forecast bubble -->
-      <div style="display:flex;justify-content:flex-end;">
+      <!-- Day cards -->
+      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;">
+        <div class="wx-loading">📡 Fetching forecast…</div>
+      </div>
+      <!-- Tabs below day cards, inside the bubble -->
+      <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px;">
         <div class="weather-tabs">
           <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
           <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
           <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
           <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
         </div>
-      </div>
-      <!-- Day cards -->
-      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;overflow-x:auto;">
-        <div class="wx-loading">📡 Fetching forecast…</div>
       </div>
     </div>
 
@@ -2439,21 +2438,25 @@ function renderSolarInfoBar() {
 
   document.getElementById('solarInfoBar').innerHTML = chips.map(c => `
     <div style="
+      width:80px;
+      min-width:80px;
+      height:118px;
+      min-height:118px;
+      border-radius:8px;
+      padding:8px 6px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
       display:flex;
       flex-direction:column;
       align-items:center;
+      justify-content:space-between;
       text-align:center;
-      padding:6px 12px;
-      border-radius:8px;
-      background:rgba(255,255,255,0.03);
-      border:1px solid rgba(255,255,255,0.07);
-      min-width:80px;
-      flex-shrink:0;
+      box-sizing:border-box;
     ">
-      <div style="font-size:1.2rem;margin-bottom:3px">${c.icon}</div>
-      <div style="font-size:0.58rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;margin-bottom:2px">${c.label}</div>
-      <div style="font-size:0.88rem;font-weight:700;color:#F1F5F9;line-height:1.2">${c.value}</div>
-      ${c.sub ? `<div style="font-size:0.58rem;color:#475569;margin-top:1px">${c.sub}</div>` : ''}
+      <div style="font-size:0.58rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600;line-height:1.2">${c.label}</div>
+      <div style="font-size:1.3rem;line-height:1">${c.icon}</div>
+      <div style="font-size:0.82rem;font-weight:700;color:#F1F5F9;line-height:1.1">${c.value}</div>
+      ${c.sub ? `<div style="font-size:0.58rem;color:#475569;line-height:1.2;overflow:hidden;text-overflow:ellipsis;width:100%">${c.sub}</div>` : '<div></div>'}
     </div>`).join('');
 }
 
