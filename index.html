@@ -562,6 +562,7 @@
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
     #weatherMainRow { flex-direction: column !important; max-width: 100% !important; }
+    #weatherMainRow > div { padding-bottom: 12px !important; }
     #solarInfoBar { flex-wrap: nowrap !important; justify-content: stretch; }
     #solarInfoBar > div { flex: 1 !important; width: auto !important; min-width: 0 !important; }
     .gauge-title { text-align: center !important; }
@@ -740,10 +741,16 @@
   <!-- KPI CARDS -->
   <div class="kpi-grid" id="kpiGrid"></div>
 
-  <!-- MAIN TIME-SERIES CHART -->
-  <div class="chart-card">
-    <div class="chart-title">⚡ Power Flow — Production, Consumption, Battery & Grid</div>
-    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+  <!-- MAIN CHARTS: Power Flow + Battery SOC side by side on desktop -->
+  <div class="two-col" style="margin-bottom:0;">
+    <div class="chart-card" style="margin-bottom:20px;">
+      <div class="chart-title">⚡ Power Flow — Production, Consumption, Battery & Grid</div>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    </div>
+    <div class="chart-card" style="margin-bottom:20px;">
+      <div class="chart-title">🔋 Battery State of Charge (%)</div>
+      <div class="chart-wrap"><canvas id="socChart"></canvas></div>
+    </div>
   </div>
 
   <!-- CONTROLS (between Power Flow and Battery SOC) -->
@@ -783,12 +790,6 @@
         <button class="toggle-btn" onclick="resetFilters()" style="">Reset All</button>
       </div>
     </div>
-  </div>
-
-  <!-- SOC CHART -->
-  <div class="chart-card">
-    <div class="chart-title">🔋 Battery State of Charge (%)</div>
-    <div class="chart-wrap"><canvas id="socChart"></canvas></div>
   </div>
 
   <!-- TWO COLUMN -->
