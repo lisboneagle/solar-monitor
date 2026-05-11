@@ -554,6 +554,10 @@
     .main { padding: 12px 10px; }
     .slider-container { width: 130px; }
     .upload-banner { padding: 10px 12px; grid-template-columns: 1fr !important; }
+    #weatherDays .wx-day-label { font-size: 0.55rem !important; }
+    #weatherDays .wx-day-date  { font-size: 0.6rem !important; }
+    #weatherDays .wx-temp      { font-size: 0.72rem !important; }
+    #weatherDays .wx-icon      { font-size: 1.1rem !important; }
     .col-map-section { padding: 10px 12px; }
     .header-cost-value { font-size: 1.2rem !important; letter-spacing: -0.3px; }
     .header-cost-label { font-size: 0.58rem !important; }
@@ -562,9 +566,11 @@
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
     #weatherMainRow { flex-direction: column !important; max-width: 100% !important; }
-    #weatherMainRow > div { padding-bottom: 12px !important; }
-    #solarInfoBar { flex-wrap: nowrap !important; justify-content: stretch; }
-    #solarInfoBar > div { flex: 1 !important; width: auto !important; min-width: 0 !important; }
+    #weatherMainRow > div { padding-bottom: 12px !important; width: 100% !important; box-sizing: border-box !important; }
+    #solarInfoBar { flex-wrap: nowrap !important; }
+    #solarInfoBar > div { flex: 1 !important; width: auto !important; min-width: 0 !important; font-size: 0.7rem !important; }
+    #weatherDays { flex-wrap: nowrap !important; overflow-x: visible !important; }
+    #weatherDays .wx-day { flex: 1 !important; width: auto !important; min-width: 0 !important; }
     .gauge-title { text-align: center !important; }
     /* Fix weather section padding on mobile */
     #weatherMainRow > div { width: 100% !important; box-sizing: border-box !important; }
