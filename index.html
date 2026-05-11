@@ -555,7 +555,8 @@
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
     #weatherMainRow { flex-direction: column !important; }
-    #solarInfoBar { flex-wrap: wrap !important; justify-content: space-between; }
+    #solarInfoBar { flex-wrap: nowrap !important; justify-content: stretch; }
+    #solarInfoBar > div { flex: 1 !important; width: auto !important; min-width: 0 !important; }
     .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
@@ -2368,7 +2369,7 @@ async function loadWeather() {  const lat = -26.7413, lon = 27.8498;
   // Fetch forecast
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max,sunrise,sunset,sunshine_duration` +
-    `&timezone=Africa%2FJohannesburg&forecast_days=7`;
+    `&timezone=Africa%2FJohannesburg&forecast_days=4`;
   try {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error('fetch failed');
@@ -2429,11 +2430,10 @@ function renderSolarInfoBar() {
   }
 
   const chips = [
-    { icon: '🌅', label: 'Sunrise',       value: sunrise,    sub: azSunrise !== '—' ? `Az ${azSunrise}` : '' },
-    { icon: '🌞', label: 'Solar Noon',    value: solarNoon,  sub: 'Peak intensity' },
-    { icon: '🌇', label: 'Sunset',        value: sunset,     sub: azSunset !== '—' ? `Az ${azSunset}` : '' },
-    { icon: '⏱',  label: 'Daylight',      value: daylightStr,sub: 'Total duration' },
-    { icon: '🔆', label: 'Peak UV',       value: d.uv_index_max?.[idx]?.toFixed(1) ?? '—', sub: 'UV Index today' },
+    { icon: '🌅', label: 'Sunrise',    value: sunrise,    sub: azSunrise !== '—' ? `Az ${azSunrise}` : '' },
+    { icon: '🌞', label: 'Solar Noon', value: solarNoon,  sub: 'Peak intensity' },
+    { icon: '🌇', label: 'Sunset',     value: sunset,     sub: azSunset !== '—' ? `Az ${azSunset}` : '' },
+    { icon: '⏱',  label: 'Daylight',   value: daylightStr,sub: 'Total duration' },
   ];
 
   document.getElementById('solarInfoBar').innerHTML = chips.map(c => `
@@ -2469,7 +2469,7 @@ function renderWeather() {
   const themeClass = `theme-${wxTab}`;
   const accentColor = WX_TAB_COLORS[wxTab];
 
-  const cards = d.time.map((date, i) => {
+  const cards = d.time.slice(0, 4).map((date, i) => {
     const dt = new Date(date + 'T12:00:00');
     const isToday = date === today;
     const dayLabel = isToday ? 'Today' : dayNames[dt.getDay()];
