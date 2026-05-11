@@ -554,6 +554,7 @@
     .period-filter .ctrl-row { flex-wrap: nowrap; gap: 6px; }
     #loadShiftContent { grid-template-columns: 1fr !important; }
     .billing-kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    #solarInfoBar { flex-direction: row !important; flex-wrap: wrap !important; min-width: 0 !important; width: 100% !important; }
     .toggle-btn { padding: 5px 8px; font-size: 0.75rem; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
@@ -634,26 +635,54 @@
 <!-- WEATHER SECTION -->
 <div style="background:linear-gradient(135deg,#0A1628 0%,#0F2744 100%);border-bottom:1px solid var(--border);padding:14px 28px;">
 
-  <!-- Header row: title + tabs -->
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
-    <div>
-      <div class="insights-title" style="margin-bottom:2px;">🌤 Weather &amp; Solar Forecast</div>
-      <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
+  <!-- Title + location -->
+  <div style="margin-bottom:10px;">
+    <div class="insights-title" style="margin-bottom:2px;">🌤 Weather &amp; Solar Forecast</div>
+    <div class="weather-location" id="wxLocation" style="font-size:0.72rem;color:#94A3B8;">📍 Vereeniging, Gauteng</div>
+  </div>
+
+  <!-- Main row: solar info + forecast cards side by side -->
+  <div style="display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
+
+    <!-- Solar info panel -->
+    <div id="solarInfoBar" style="
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px 12px;
+      background:rgba(255,255,255,0.02);
+      flex-shrink:0;
+      min-width:140px;
+      justify-content:space-between;
+    "></div>
+
+    <!-- 7-day forecast panel -->
+    <div style="
+      flex:1;
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:10px 12px;
+      background:rgba(255,255,255,0.02);
+      min-width:0;
+      overflow:hidden;
+    ">
+      <div class="weather-days" id="weatherDays" style="justify-content:flex-start;">
+        <div class="wx-loading">📡 Fetching forecast…</div>
+      </div>
     </div>
+
+  </div>
+
+  <!-- Tab buttons below -->
+  <div style="display:flex;justify-content:flex-end;margin-top:10px;">
     <div class="weather-tabs">
       <button class="wx-tab active" data-tab="overview" onclick="setWxTab('overview')">Overview</button>
       <button class="wx-tab" data-tab="precip" onclick="setWxTab('precip')">Precipitation</button>
       <button class="wx-tab" data-tab="cloud" onclick="setWxTab('cloud')">Cloud Cover</button>
       <button class="wx-tab" data-tab="uv" onclick="setWxTab('uv')">UV Index</button>
     </div>
-  </div>
-
-  <!-- Solar info bar for today -->
-  <div id="solarInfoBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;"></div>
-
-  <!-- 7-day forecast days -->
-  <div class="weather-days" id="weatherDays">
-    <div class="wx-loading">📡 Fetching forecast…</div>
   </div>
 
 </div>
@@ -2407,18 +2436,21 @@ function renderSolarInfoBar() {
 
   document.getElementById('solarInfoBar').innerHTML = chips.map(c => `
     <div style="
-      background:rgba(255,255,255,0.04);
-      border:1px solid var(--border);
-      border-radius:8px;
-      padding:6px 12px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:5px 8px;
+      border-radius:6px;
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.06);
       flex:1;
-      min-width:80px;
-      text-align:center;
     ">
-      <div style="font-size:1rem;margin-bottom:2px">${c.icon}</div>
-      <div style="font-size:0.62rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600">${c.label}</div>
-      <div style="font-size:0.88rem;font-weight:700;color:#F1F5F9">${c.value}</div>
-      ${c.sub ? `<div style="font-size:0.58rem;color:#475569">${c.sub}</div>` : ''}
+      <div style="font-size:1.1rem;flex-shrink:0">${c.icon}</div>
+      <div>
+        <div style="font-size:0.58rem;color:#64748B;text-transform:uppercase;letter-spacing:0.4px;font-weight:600">${c.label}</div>
+        <div style="font-size:0.85rem;font-weight:700;color:#F1F5F9;line-height:1.2">${c.value}</div>
+        ${c.sub ? `<div style="font-size:0.58rem;color:#475569">${c.sub}</div>` : ''}
+      </div>
     </div>`).join('');
 }
 
