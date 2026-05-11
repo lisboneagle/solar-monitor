@@ -706,7 +706,7 @@
 <div class="main">
 
   <!-- PERIOD FILTER -->
-  <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px">
+  <div class="controls period-filter" style="margin-bottom:10px;padding:10px 20px;justify-content:center;">
     <div class="ctrl-group" style="border:1px solid var(--border);border-radius:8px;padding:8px 14px;">
       <div class="ctrl-label">View Period</div>
       <div class="ctrl-row">
@@ -725,15 +725,18 @@
         <button class="toggle-btn" onclick="resetPeriod()" style="flex:1;text-align:center;white-space:nowrap;font-size:0.72rem">↺ Reset</button>
       </div>
     </div>
-    <div class="ctrl-group" id="periodNote">
-      <div class="ctrl-label" style="color:#475569;font-size:0.68rem" id="periodNoteText">Showing today's 5-min data</div>
-    </div>
   </div>
 
   <!-- KPI CARDS -->
   <div class="kpi-grid" id="kpiGrid"></div>
 
-  <!-- CONTROLS -->
+  <!-- MAIN TIME-SERIES CHART -->
+  <div class="chart-card">
+    <div class="chart-title">⚡ Power Flow — Production, Consumption, Battery & Grid</div>
+    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+  </div>
+
+  <!-- CONTROLS (between Power Flow and Battery SOC) -->
   <div class="controls">
     <div class="ctrl-group" id="sliderCtrlGroup">
       <div class="ctrl-label">Time Range</div>
@@ -770,12 +773,6 @@
         <button class="toggle-btn" onclick="resetFilters()" style="flex:1;text-align:center">Reset All</button>
       </div>
     </div>
-  </div>
-
-  <!-- MAIN TIME-SERIES CHART -->
-  <div class="chart-card">
-    <div class="chart-title">⚡ Power Flow — Production, Consumption, Battery & Grid</div>
-    <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
   </div>
 
   <!-- SOC CHART -->
