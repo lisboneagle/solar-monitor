@@ -1,32 +1,31 @@
 # .github/workflows/fetch-deye-data.yml
 #
-# Runs every day at 23:30 SAST (21:30 UTC) to fetch the day's solar data
-# from the Deye Cloud API and commit it to the repo so the dashboard
-# auto-loads it on next page open.
+# Runs every 30 minutes to fetch solar data from the Deye Cloud API.
+# Can also be triggered manually with an optional date override.
 #
-# Required GitHub Secrets (Settings → Secrets → Actions → New repository secret):
-#   DEYE_APP_ID       Your DeyeCloud AppId
-#   DEYE_APP_SECRET   Your DeyeCloud AppSecret
-#   DEYE_EMAIL        Your DeyeCloud account email
-#   DEYE_PASSWORD     Your DeyeCloud account password (plain text — script hashes it)
-#   DEYE_STATION_ID   Your station ID (run workflow once with empty value to discover it)
+# Required GitHub Secrets:
+#   DEYE_APP_ID, DEYE_APP_SECRET, DEYE_EMAIL, DEYE_PASSWORD, DEYE_STATION_ID
 
 name: Fetch Deye Solar Data
 
 on:
   schedule:
-    # Runs every 30 minutes — keeps the dashboard current throughout the day
-    # Each run takes ~15 seconds, well within GitHub Actions free tier limits
+    # Runs every 30 minutes
     - cron: "*/30 * * * *"
 
-  # Allow manual trigger from the Actions tab for testing
+  # Manual trigger with optional date input
   workflow_dispatch:
+    inputs:
+      target_date:
+        description: 'Date to fetch (YYYY-MM-DD). Leave empty for today.'
+        required: false
+        default: ''
 
 jobs:
   fetch-and-commit:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to commit back to the repo
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -47,6 +46,7 @@ jobs:
           DEYE_EMAIL:      ${{ secrets.DEYE_EMAIL }}
           DEYE_PASSWORD:   ${{ secrets.DEYE_PASSWORD }}
           DEYE_STATION_ID: ${{ secrets.DEYE_STATION_ID }}
+          TARGET_DATE:     ${{ github.event.inputs.target_date }}
         run: python fetch_deye_data.py
 
       - name: Commit and push data
@@ -54,6 +54,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          # Only commit if something actually changed
-          git diff --staged --quiet || git commit -m "chore: solar data $(date -u +'%Y-%m-%d')"
+          git diff --cached --quiet || git commit -m "Solar data update $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git push
