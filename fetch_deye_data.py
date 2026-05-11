@@ -94,7 +94,11 @@ if not station_id:
 
 # ── Step 3: Target date (SAST = UTC+2) ───────────────────────────────────────
 now_local   = datetime.now(timezone.utc) + timedelta(hours=2)
-target_date = now_local.strftime("%Y-%m-%d")
+# Allow TARGET_DATE env var for manual backfilling — falls back to today
+env_date    = os.environ.get("TARGET_DATE", "").strip()
+target_date = env_date if env_date else now_local.strftime("%Y-%m-%d")
+if env_date:
+    print(f"  📅 Backfill mode: fetching data for {target_date}")
 print(f"  Fetching data for {target_date} (station {station_id})...")
 
 # ── Step 4: Fetch 5-minute history ───────────────────────────────────────────
