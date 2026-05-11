@@ -568,6 +568,9 @@
     /* Fix weather section padding on mobile */
     #weatherMainRow > div { width: 100% !important; box-sizing: border-box !important; }
     .toggle-btn { padding: 2px 6px; font-size: 0.58rem; height: 20px; }
+    .nav-reset-row { display: none !important; }
+    .mobile-only-reset { display: inline-flex !important; }
+    .cb-group { justify-content: center; }
     .weather-days {
       overflow-x: auto; overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
@@ -726,6 +729,9 @@
         <button class="toggle-btn" onclick="shiftPeriod(-1)" style="white-space:nowrap">◀ Prev</button>
         <span id="periodLabel" style="font-size:0.8rem;color:var(--text);font-weight:600;min-width:60px;text-align:center;white-space:nowrap">Today</span>
         <button class="toggle-btn" id="btnNext" onclick="shiftPeriod(1)" style="white-space:nowrap">Next ▶</button>
+        <button class="toggle-btn mobile-only-reset" onclick="resetPeriod()" style="white-space:nowrap;display:none">↺ Reset</button>
+      </div>
+      <div class="ctrl-row nav-reset-row" style="justify-content:center;margin-top:4px;">
         <button class="toggle-btn" onclick="resetPeriod()" style="white-space:nowrap">↺ Reset</button>
       </div>
     </div>
