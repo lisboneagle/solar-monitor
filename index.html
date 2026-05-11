@@ -1912,11 +1912,29 @@ function renderInsights() {
   const gridIndep = totalCons > 0 ? ((1 - totalGrid / totalCons) * 100).toFixed(1) : '0.0';
 
   const insights = [
-    `🌞 Solar generation began at <b>${firstPV}</b> and peaked at <b>${peakPVTime}</b> with <b>${peakPVRow.pv_kw.toFixed(2)} kW</b> peak output.`,
-    `🔋 Battery SOC swung from <b>${minSOC}%</b> to <b>${maxSOC}%</b> — a range of <b>${maxSOC - minSOC}%</b> across the day.`,
+    pvRows.length
+      ? `🌞 Solar generation began at <b>${firstPV}</b> and peaked at <b>${peakPVTime}</b> with <b>${peakPVRow.pv_kw.toFixed(2)} kW</b> peak output.`
+      : (() => {
+          // Get today's sunrise from Open-Meteo weather data if available
+          let sunriseStr = '';
+          if (wxData && wxData.daily && wxData.daily.sunrise) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayIdx = wxData.daily.time.indexOf(todayStr);
+            if (todayIdx >= 0 && wxData.daily.sunrise[todayIdx]) {
+              const sr = new Date(wxData.daily.sunrise[todayIdx]);
+              const hh = String(sr.getHours()).padStart(2,'0');
+              const mm = String(sr.getMinutes()).padStart(2,'0');
+              sunriseStr = ` Sunrise expected at <b>${hh}:${mm}</b> — generation should begin shortly after.`;
+            }
+          }
+          return `🌞 No solar generation recorded yet today.${sunriseStr}`;
+        })(),
+    `🔋 Battery SOC started at <b>${DATA[0].soc_pct}%</b>, reached <b>${maxSOC}%</b> high and <b>${minSOC}%</b> low — a swing of <b>${maxSOC - minSOC}%</b> across the day.`,
     `🏠 Average home consumption was <b>${avgCons.toFixed(2)} kW</b>, peaking at <b>${maxConsRow.consumption_kw.toFixed(2)} kW</b> at <b>${fmtTime(maxConsRow.time)}</b>.`,
     `⚡ The system operated grid-independently for <b>${pctIndep}%</b> of 5-minute intervals (grid draw < 0.05 kW).`,
-    `📈 Total solar energy harvested: <b>${totalPV.toFixed(1)} kWh</b> — enough to power the home for <b>${hrsAtAvgLoad.toFixed(1)} hours</b> at average load.`,
+    totalPV > 0.01
+      ? `📈 Total solar energy harvested: <b>${totalPV.toFixed(1)} kWh</b> — enough to power the home for <b>${hrsAtAvgLoad.toFixed(1)} hours</b> at average load.`
+      : `📈 No solar energy harvested yet today.`,
     `🌙 During night hours (00:00–06:00), the battery supplied <b>${nightBatKwh.toFixed(2)} kWh</b> to cover home load.`,
   ];
   document.getElementById('insightsPanel').innerHTML = insights.map(t => `<div class="insight-item">${t}</div>`).join('');
@@ -2294,7 +2312,7 @@ async function loadWeather() {  const lat = -26.7413, lon = 27.8498;
 
   // Fetch forecast
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max` +
+    `&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,cloudcover_mean,uv_index_max,sunrise,sunset` +
     `&timezone=Africa%2FJohannesburg&forecast_days=7`;
   try {
     const resp = await fetch(url);
