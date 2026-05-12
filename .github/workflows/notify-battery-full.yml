@@ -1,0 +1,93 @@
+# .github/workflows/notify-battery-full.yml
+#
+# Checks every 30 minutes if battery SOC has reached 100%
+# and sends a WhatsApp notification via CallMeBot.
+#
+# Required GitHub Secrets:
+#   WHATSAPP_PHONE    Your phone number with country code (e.g. 27722212221)
+#   WHATSAPP_APIKEY   Your CallMeBot API key
+
+name: Notify — Battery Full
+
+on:
+  schedule:
+    # Runs every 30 minutes, same cadence as data fetch
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check SOC and notify if full
+        env:
+          WHATSAPP_PHONE:  "27722212221"
+          WHATSAPP_APIKEY: "8812500"
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request, urllib.parse, datetime
+
+          PHONE  = os.environ["WHATSAPP_PHONE"]
+          APIKEY = os.environ["WHATSAPP_APIKEY"]
+          FLAG   = "data/.notified_battery_full"
+
+          # Load latest data
+          try:
+              with open("data/latest.json") as f:
+                  data = json.load(f)
+              rows = data.get("rows", [])
+          except Exception as e:
+              print(f"Could not read latest.json: {e}")
+              exit(0)
+
+          if not rows:
+              print("No rows in latest.json")
+              exit(0)
+
+          last = rows[-1]
+          soc  = last.get("soc_pct", 0)
+          date = data.get("date", datetime.date.today().isoformat())
+          print(f"Current SOC: {soc}%")
+
+          # Check if already notified today
+          today = datetime.date.today().isoformat()
+          if os.path.exists(FLAG):
+              with open(FLAG) as f:
+                  last_notified = f.read().strip()
+              if last_notified == today:
+                  print("Already notified today — skipping")
+                  exit(0)
+
+          if soc >= 100:
+              msg = (
+                  f"🔋✅ *Battery Full!*\n"
+                  f"Your solar battery has reached 100% SOC.\n"
+                  f"Excess solar energy is now being exported or limited.\n"
+                  f"📅 {date} | 🕐 {last.get('time','')[-8:-3]} SAST"
+              )
+              encoded = urllib.parse.quote(msg)
+              url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE}&text={encoded}&apikey={APIKEY}"
+              try:
+                  urllib.request.urlopen(url)
+                  print("✅ WhatsApp notification sent: Battery Full")
+                  # Write flag so we don't spam today
+                  os.makedirs("data", exist_ok=True)
+                  with open(FLAG, "w") as f:
+                      f.write(today)
+              except Exception as e:
+                  print(f"Failed to send notification: {e}")
+          else:
+              print(f"SOC is {soc}% — not full yet, no notification")
+          EOF
+
+      - name: Commit notification flag if updated
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/.notified_battery_full 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: battery full notification flag"
+          git push 2>/dev/null || true

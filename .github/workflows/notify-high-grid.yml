@@ -1,0 +1,99 @@
+# .github/workflows/notify-high-grid.yml
+#
+# Checks every 30 minutes if grid draw exceeds 6.5 kW
+# and sends a WhatsApp notification via CallMeBot.
+# Will not re-notify until grid draw drops below threshold and rises again.
+#
+# Required GitHub Secrets:
+#   WHATSAPP_PHONE    Your phone number with country code
+#   WHATSAPP_APIKEY   Your CallMeBot API key
+
+name: Notify — High Grid Draw
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check grid draw and notify if high
+        env:
+          WHATSAPP_PHONE:  "27722212221"
+          WHATSAPP_APIKEY: "8812500"
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request, urllib.parse, datetime
+
+          PHONE      = os.environ["WHATSAPP_PHONE"]
+          APIKEY     = os.environ["WHATSAPP_APIKEY"]
+          FLAG       = "data/.notified_high_grid"
+          THRESHOLD  = 6.5  # kW
+
+          try:
+              with open("data/latest.json") as f:
+                  data = json.load(f)
+              rows = data.get("rows", [])
+          except Exception as e:
+              print(f"Could not read latest.json: {e}")
+              exit(0)
+
+          if not rows:
+              exit(0)
+
+          # Average last 3 readings (~15 min) to avoid spurious spikes
+          recent = rows[-3:]
+          avg_grid = sum(r.get("grid_kw", 0) for r in recent) / len(recent)
+          last = rows[-1]
+          print(f"Avg grid draw (last 15 min): {avg_grid:.2f} kW")
+
+          # Read flag state: "notified" or "clear"
+          flag_state = "clear"
+          if os.path.exists(FLAG):
+              with open(FLAG) as f:
+                  flag_state = f.read().strip()
+
+          if avg_grid >= THRESHOLD:
+              if flag_state == "notified":
+                  print("Already notified for this high-grid event — skipping")
+                  exit(0)
+
+              msg = (
+                  f"⚡⚠️ *High Grid Draw Alert!*\n"
+                  f"Your grid import is *{avg_grid:.1f} kW* (threshold: {THRESHOLD} kW).\n"
+                  f"Consider switching off high-load appliances.\n"
+                  f"🕐 {last.get('time','')[-8:-3]} SAST"
+              )
+              encoded = urllib.parse.quote(msg)
+              url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE}&text={encoded}&apikey={APIKEY}"
+              try:
+                  urllib.request.urlopen(url)
+                  print(f"✅ WhatsApp notification sent: High Grid Draw ({avg_grid:.1f} kW)")
+                  with open(FLAG, "w") as f:
+                      f.write("notified")
+              except Exception as e:
+                  print(f"Failed to send notification: {e}")
+
+          else:
+              # Grid is back below threshold — reset flag so next spike triggers again
+              if flag_state == "notified":
+                  with open(FLAG, "w") as f:
+                      f.write("clear")
+                  print("Grid draw back to normal — flag reset")
+              else:
+                  print(f"Grid draw {avg_grid:.2f} kW — below threshold, no action")
+          EOF
+
+      - name: Commit flag if updated
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/.notified_high_grid 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: high grid notification flag"
+          git push 2>/dev/null || true

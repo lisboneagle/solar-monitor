@@ -1,0 +1,109 @@
+# .github/workflows/notify-daily-summary.yml
+#
+# Sends a daily WhatsApp summary at 21:00 SAST (19:00 UTC)
+# with key solar stats for the day.
+#
+# Required GitHub Secrets:
+#   WHATSAPP_PHONE    Your phone number with country code
+#   WHATSAPP_APIKEY   Your CallMeBot API key
+
+name: Notify — Daily Summary
+
+on:
+  schedule:
+    # 19:00 UTC = 21:00 SAST
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-summary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and send daily summary
+        env:
+          WHATSAPP_PHONE:  "27722212221"
+          WHATSAPP_APIKEY: "8812500"
+        run: |
+          python3 - <<'EOF'
+          import json, os, urllib.request, urllib.parse, datetime
+
+          PHONE  = os.environ["WHATSAPP_PHONE"]
+          APIKEY = os.environ["WHATSAPP_APIKEY"]
+
+          try:
+              with open("data/latest.json") as f:
+                  data = json.load(f)
+              rows = data.get("rows", [])
+              date = data.get("date", datetime.date.today().isoformat())
+          except Exception as e:
+              print(f"Could not read latest.json: {e}")
+              exit(1)
+
+          if not rows:
+              print("No data rows available")
+              exit(1)
+
+          INTERVAL_H = 5 / 60  # 5-minute intervals in hours
+
+          # Calculate daily stats
+          total_pv      = sum(r.get("pv_kw", 0)           for r in rows) * INTERVAL_H
+          total_cons    = sum(r.get("consumption_kw", 0)   for r in rows) * INTERVAL_H
+          total_grid    = sum(max(0, r.get("grid_kw", 0))  for r in rows) * INTERVAL_H
+          total_bat_dis = sum(r.get("battery_kw", 0) for r in rows if r.get("battery_kw", 0) > 0) * INTERVAL_H
+          peak_pv       = max((r.get("pv_kw", 0) for r in rows), default=0)
+          current_soc   = rows[-1].get("soc_pct", 0)
+          grid_indep    = (1 - total_grid / total_cons * 100) if total_cons > 0 else 0
+          grid_indep    = max(0, min(100, (1 - total_grid / total_cons) * 100)) if total_cons > 0 else 0
+
+          # Simple SA tiered tariff cost estimate (summer rates, VAT incl)
+          def tiered_cost(kwh):
+              tiers = [(50, 199.98), (350, 233.85), (600, 312.16), (float('inf'), 375.75)]
+              cost, prev = 0, 0
+              for limit, rate in tiers:
+                  block = min(kwh, limit - prev)
+                  if block <= 0: break
+                  cost += block * rate
+                  kwh  -= block
+                  prev  = limit
+                  if kwh <= 0: break
+              return cost / 100  # cents to rands
+
+          grid_cost     = tiered_cost(total_grid)
+          no_solar_cost = tiered_cost(total_cons)
+          savings       = max(0, no_solar_cost - grid_cost)
+
+          # Format date nicely
+          try:
+              dt = datetime.datetime.strptime(date, "%Y-%m-%d")
+              nice_date = dt.strftime("%-d %B %Y")
+          except:
+              nice_date = date
+
+          msg = (
+              f"☀️ *Solar Daily Summary*\n"
+              f"📅 {nice_date}\n\n"
+              f"⚡ PV Generated:     *{total_pv:.1f} kWh*\n"
+              f"🏠 Home Consumed:    *{total_cons:.1f} kWh*\n"
+              f"🔌 Grid Imported:    *{total_grid:.1f} kWh*\n"
+              f"🔋 Battery Discharged: *{total_bat_dis:.1f} kWh*\n"
+              f"📈 Peak PV Output:   *{peak_pv:.2f} kW*\n"
+              f"🌐 Grid Independence: *{grid_indep:.1f}%*\n"
+              f"🔋 End-of-day SOC:   *{current_soc}%*\n\n"
+              f"💰 Grid Cost:        *R {grid_cost:.2f}*\n"
+              f"💚 Savings vs grid:  *R {savings:.2f}*"
+          )
+
+          encoded = urllib.parse.quote(msg)
+          url = f"https://api.callmebot.com/whatsapp.php?phone={PHONE}&text={encoded}&apikey={APIKEY}"
+          try:
+              urllib.request.urlopen(url)
+              print(f"✅ Daily summary sent for {date}")
+              print(f"   PV: {total_pv:.1f} kWh | Grid: {total_grid:.1f} kWh | SOC: {current_soc}% | Savings: R{savings:.2f}")
+          except Exception as e:
+              print(f"Failed to send notification: {e}")
+              exit(1)
+          EOF
