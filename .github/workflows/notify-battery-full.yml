@@ -27,12 +27,16 @@ jobs:
         env:
           WHATSAPP_PHONE:  "27722212221"
           WHATSAPP_APIKEY: "8812500"
+          WHATSAPP_PHONE2:  "27833047911"
+          WHATSAPP_APIKEY2: "2164311"
         run: |
           python3 - <<'EOF'
           import json, os, urllib.request, urllib.parse, datetime
 
           PHONE  = os.environ["WHATSAPP_PHONE"]
           APIKEY = os.environ["WHATSAPP_APIKEY"]
+          PHONE2  = os.environ["WHATSAPP_PHONE2"]
+          APIKEY2 = os.environ["WHATSAPP_APIKEY2"]
           FLAG   = "data/.notified_battery_full"
 
           # Load latest data
@@ -74,6 +78,9 @@ jobs:
               try:
                   urllib.request.urlopen(url)
                   print("✅ WhatsApp notification sent: Battery Full")
+                  url2 = f"https://api.callmebot.com/whatsapp.php?phone={PHONE2}&text={encoded}&apikey={APIKEY2}"
+                  urllib.request.urlopen(url2)
+                  print("✅ WhatsApp notification sent to second number")
                   # Write flag so we don't spam today
                   os.makedirs("data", exist_ok=True)
                   with open(FLAG, "w") as f:

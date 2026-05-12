@@ -27,12 +27,16 @@ jobs:
         env:
           WHATSAPP_PHONE:  "27722212221"
           WHATSAPP_APIKEY: "8812500"
+          WHATSAPP_PHONE2:  "27833047911"
+          WHATSAPP_APIKEY2: "2164311"
         run: |
           python3 - <<'EOF'
           import json, os, urllib.request, urllib.parse, datetime
 
           PHONE  = os.environ["WHATSAPP_PHONE"]
           APIKEY = os.environ["WHATSAPP_APIKEY"]
+          PHONE2  = os.environ["WHATSAPP_PHONE2"]
+          APIKEY2 = os.environ["WHATSAPP_APIKEY2"]
 
           try:
               with open("data/latest.json") as f:
@@ -102,6 +106,9 @@ jobs:
           try:
               urllib.request.urlopen(url)
               print(f"✅ Daily summary sent for {date}")
+              url2 = f"https://api.callmebot.com/whatsapp.php?phone={PHONE2}&text={encoded}&apikey={APIKEY2}"
+              urllib.request.urlopen(url2)
+              print("✅ Daily summary sent to second number")
               print(f"   PV: {total_pv:.1f} kWh | Grid: {total_grid:.1f} kWh | SOC: {current_soc}% | Savings: R{savings:.2f}")
           except Exception as e:
               print(f"Failed to send notification: {e}")
