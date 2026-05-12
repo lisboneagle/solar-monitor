@@ -25,10 +25,10 @@ jobs:
 
       - name: Build and send daily summary
         env:
-          WHATSAPP_PHONE:  "27722212221"
-          WHATSAPP_APIKEY: "8812500"
-          WHATSAPP_PHONE2:  "27833047911"
-          WHATSAPP_APIKEY2: "2164311"
+          WHATSAPP_PHONE:  ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
+          WHATSAPP_PHONE2:  ${{ secrets.WHATSAPP_PHONE2 }}
+          WHATSAPP_APIKEY2: ${{ secrets.WHATSAPP_APIKEY2 }}
         run: |
           python3 - <<'EOF'
           import json, os, urllib.request, urllib.parse, datetime
