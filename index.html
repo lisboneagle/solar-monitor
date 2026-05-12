@@ -1519,7 +1519,7 @@ function buildAggregatedCharts(pd) {
     type: 'doughnut',
     data: {
       labels: [`PV (${totalPV.toFixed(1)} kWh)`, `Battery Discharge (${totalBat.toFixed(1)} kWh)`, `Grid Import (${totalGrid.toFixed(1)} kWh)`],
-      datasets: [{ data: [totalPV, totalBat, totalGrid], backgroundColor: ['#22C55E','#8B5CF6','#F97316'], borderColor: '#1E293B', borderWidth: 3 }]
+      datasets: [{ data: [totalPV, totalBat, totalGrid], backgroundColor: ['#22C55E','#8B5CF6','#F5276C'], borderColor: '#1E293B', borderWidth: 3 }]
     },
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8', font: { size: 10 } } },
@@ -1648,7 +1648,7 @@ function renderKPIs() {
     { icon: '🏠', label: 'Total Consumption', value: k.totalCons.toFixed(1),    unit: 'kWh', sub: 'home energy used',               accent: '#3B82F6' },
     { icon: '🔋', label: 'Battery SOC',        value: k.currentSOC,             unit: '%',   sub: 'current state of charge',        accent: '#10B981' },
     { icon: '📊', label: 'SOC Range',          value: `${k.minSOC}–${k.maxSOC}`,unit: '%',   sub: 'min → max today',                accent: '#8B5CF6' },
-    { icon: '🔌', label: 'Total Grid Input',   value: k.totalGrid.toFixed(2),   unit: 'kWh', sub: 'imported from grid today',       accent: '#EF4444' },
+    { icon: '🔌', label: 'Total Grid Input',   value: k.totalGrid.toFixed(2),   unit: 'kWh', sub: 'imported from grid today',       accent: '#F5276C' },
     { icon: '🌐', label: 'Grid Independence',  value: k.gridIndep.toFixed(1),   unit: '%',   sub: 'of energy from solar+battery',   accent: '#14B8A6' },
     { icon: '♻️', label: 'CO₂ Avoided',        value: co2Avoided.toFixed(1),    unit: 'kg',  sub: `≈ ${kmEquiv} km not driven`,     accent: '#22C55E' },
   ];
@@ -1668,7 +1668,7 @@ function renderKPIs() {
 const SERIES_CONF = [
   { key: 'Production', color: '#22C55E', field: 'production_kw' },
   { key: 'Consumption', color: '#EAB308', field: 'consumption_kw' },
-  { key: 'Grid', color: '#F97316', field: 'grid_kw' },
+  { key: 'Grid', color: '#F5276C', field: 'grid_kw' },
   { key: 'Battery', color: '#8B5CF6', field: 'battery_kw' },
   { key: 'PV', color: '#3B82F6', field: 'pv_kw' },
 ];
@@ -1895,7 +1895,7 @@ function buildDonutChart() {
       ],
       datasets: [{
         data: [pvEnergy, batDischarge, gridImport],
-        backgroundColor: ['#22C55E','#8B5CF6','#F97316'],
+        backgroundColor: ['#22C55E','#8B5CF6','#F5276C'],
         borderColor: '#1E293B',
         borderWidth: 3,
         hoverOffset: 6,
