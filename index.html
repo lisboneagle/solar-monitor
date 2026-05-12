@@ -1469,9 +1469,9 @@ function buildAggregatedCharts(pd) {
     data: {
       labels,
       datasets: [
-        { label: 'Production',   data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
+        { label: 'Production',   data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#22C55E99', borderColor: '#22C55E', borderWidth: 1 },
         { label: 'Consumption',  data: buckets.map(b => +b.consumption_kwh.toFixed(2)), backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
-        { label: 'Grid Import',  data: buckets.map(b => +b.grid_kwh.toFixed(2)),        backgroundColor: '#EF444499', borderColor: '#EF4444', borderWidth: 1 },
+        { label: 'Grid Import',  data: buckets.map(b => +b.grid_kwh.toFixed(2)),        backgroundColor: '#F9731699', borderColor: '#F97316', borderWidth: 1 },
         { label: 'Bat Discharge',data: buckets.map(b => +b.battery_dis_kwh.toFixed(2)), backgroundColor: '#8B5CF699', borderColor: '#8B5CF6', borderWidth: 1 },
       ]
     },
@@ -1519,7 +1519,7 @@ function buildAggregatedCharts(pd) {
     type: 'doughnut',
     data: {
       labels: [`PV (${totalPV.toFixed(1)} kWh)`, `Battery Discharge (${totalBat.toFixed(1)} kWh)`, `Grid Import (${totalGrid.toFixed(1)} kWh)`],
-      datasets: [{ data: [totalPV, totalBat, totalGrid], backgroundColor: ['#F97316','#8B5CF6','#EF4444'], borderColor: '#1E293B', borderWidth: 3 }]
+      datasets: [{ data: [totalPV, totalBat, totalGrid], backgroundColor: ['#22C55E','#8B5CF6','#F97316'], borderColor: '#1E293B', borderWidth: 3 }]
     },
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom', labels: { color: '#94A3B8', font: { size: 10 } } },
@@ -1536,7 +1536,7 @@ function buildAggregatedCharts(pd) {
     data: {
       labels,
       datasets: [
-        { label: 'Production',  data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#F59E0B99', borderColor: '#F59E0B', borderWidth: 1 },
+        { label: 'Production',  data: buckets.map(b => +b.production_kwh.toFixed(2)),  backgroundColor: '#22C55E99', borderColor: '#22C55E', borderWidth: 1 },
         { label: 'Consumption', data: buckets.map(b => +b.consumption_kwh.toFixed(2)), backgroundColor: '#3B82F699', borderColor: '#3B82F6', borderWidth: 1 },
       ]
     },
@@ -1667,8 +1667,8 @@ function renderKPIs() {
 // ============================================================
 const SERIES_CONF = [
   { key: 'Production', color: '#22C55E', field: 'production_kw' },
-  { key: 'Consumption', color: '#F97316', field: 'consumption_kw' },
-  { key: 'Grid', color: '#EF4444', field: 'grid_kw' },
+  { key: 'Consumption', color: '#EAB308', field: 'consumption_kw' },
+  { key: 'Grid', color: '#F97316', field: 'grid_kw' },
   { key: 'Battery', color: '#8B5CF6', field: 'battery_kw' },
   { key: 'PV', color: '#3B82F6', field: 'pv_kw' },
 ];
@@ -1895,7 +1895,7 @@ function buildDonutChart() {
       ],
       datasets: [{
         data: [pvEnergy, batDischarge, gridImport],
-        backgroundColor: ['#F97316', '#8B5CF6', '#EF4444'],
+        backgroundColor: ['#22C55E','#8B5CF6','#F97316'],
         borderColor: '#1E293B',
         borderWidth: 3,
         hoverOffset: 6,
