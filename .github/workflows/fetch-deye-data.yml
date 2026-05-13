@@ -1,6 +1,6 @@
 # .github/workflows/fetch-deye-data.yml
 #
-# Runs every 30 minutes to fetch solar data from the Deye Cloud API.
+# Runs every 5 minutes to fetch solar data from the Deye Cloud API.
 # Can also be triggered manually with an optional date override.
 #
 # Required GitHub Secrets:
@@ -10,8 +10,8 @@ name: Fetch Deye Solar Data
 
 on:
   schedule:
-    # Runs every 30 minutes
-    - cron: "*/30 * * * *"
+    # Runs every 5 minutes
+    - cron: "*/5 * * * *"
 
   # Manual trigger with optional date input
   workflow_dispatch:
