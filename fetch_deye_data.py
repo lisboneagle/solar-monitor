@@ -203,13 +203,13 @@ print(f"  ✓ Normalised {len(rows)} rows from history")
 if rows:
     print(f"  Last history record: {rows[-1]['time']}")
 
-# ── Step 5b: Fetch station/latest to fill gap between history lag and now ─────
+# ── Step 5b: Fetch station/latest — always used for latest.json ──────────────
+latest_row = None
 try:
-    print(f"  Fetching station/latest to fill gap...")
+    print(f"  Fetching station/latest for real-time values...")
     latest_resp = post("station/latest", {"stationId": int(station_id)}, token=token)
     latest_block = latest_resp.get("data", latest_resp)
 
-    # station/latest returns a flat object (not a list)
     latest_items = []
     if isinstance(latest_block, list):
         latest_items = latest_block
@@ -219,7 +219,6 @@ try:
                         [latest_block])
 
     for item in latest_items:
-        # lastUpdateTime is the confirmed timestamp field for station/latest
         raw_t = (item.get("lastUpdateTime") or
                  item.get("timeStamp") or
                  item.get("updateTime") or
@@ -228,33 +227,26 @@ try:
                  None)
 
         if raw_t is None:
-            # Fallback: use current SAST time rounded down to nearest 5 min
             now_sast = datetime.now(timezone.utc) + timedelta(hours=2)
-            minutes = (now_sast.minute // 5) * 5
+            minutes  = (now_sast.minute // 5) * 5
             now_rounded = now_sast.replace(minute=minutes, second=0, microsecond=0)
             time_str = now_rounded.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠ No timestamp found — using current SAST time: {time_str}")
+            print(f"  ⚠ No timestamp — using current SAST time: {time_str}")
         elif isinstance(raw_t, (int, float)) or (isinstance(raw_t, str) and raw_t.replace('.','').isdigit()):
             time_str = unix_to_timestr(raw_t)
         else:
             time_str = str(raw_t).replace("T", " ")[:19]
 
-        # Skip if timestamp doesn't match today
-        if not time_str or time_str[:10] != target_date:
-            print(f"  ⚠ Latest record date {time_str[:10]} doesn't match target {target_date} — skipping")
-            continue
+        latest_row = normalise(item, time_str)
+        print(f"  ✓ station/latest record: {time_str} | PV={latest_row['pv_kw']}kW grid={latest_row['grid_kw']}kW bat={latest_row['battery_kw']}kW soc={latest_row['soc_pct']}%")
 
-        # Always append/overwrite with latest if it's same time or newer
-        # This ensures the most recent inverter reading is always reflected
-        if not rows or time_str >= rows[-1]["time"]:
-            # Remove existing record at same timestamp if present
+        # Add to today's archive rows if it's today's date
+        if time_str[:10] == target_date:
             rows = [r for r in rows if r["time"] != time_str]
-            rows.append(normalise(item, time_str))
-            print(f"  ✓ Latest record added at {time_str}")
+            rows.append(latest_row)
+            print(f"  ✓ Added to today's archive")
         else:
-            # Replace the last row with latest data regardless — it's more accurate
-            rows[-1] = normalise(item, time_str)
-            print(f"  ✓ Latest record replaced last row ({time_str})")
+            print(f"  ℹ Latest timestamp {time_str[:10]} differs from target {target_date} — not added to archive")
 
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
@@ -267,12 +259,24 @@ if rows:
 
 # ── Step 6: Write output ──────────────────────────────────────────────────────
 os.makedirs("data", exist_ok=True)
-output = {"date": target_date, "station": station_id, "rows": rows}
 
+# For latest.json: use station/latest row if available (most current),
+# otherwise fall back to history rows
+latest_rows = rows.copy()
+if latest_row and (not latest_rows or latest_row["time"] >= latest_rows[-1]["time"]):
+    # Replace or append the latest real-time reading
+    latest_rows = [r for r in latest_rows if r["time"] != latest_row["time"]]
+    latest_rows.append(latest_row)
+    latest_rows.sort(key=lambda r: r["time"])
+    print(f"  ✓ latest.json will use real-time station/latest as most recent row")
+
+latest_output = {"date": target_date, "station": station_id, "rows": latest_rows}
 with open(OUTPUT_PATH, "w") as f:
-    json.dump(output, f, separators=(",", ":"))
-print(f"  ✓ {OUTPUT_PATH} written ({len(rows)} rows, {os.path.getsize(OUTPUT_PATH):,} bytes)")
+    json.dump(latest_output, f, separators=(",", ":"))
+print(f"  ✓ {OUTPUT_PATH} written ({len(latest_rows)} rows, {os.path.getsize(OUTPUT_PATH):,} bytes)")
 
+# Archive uses history rows only (for consistency in period views)
+archive_output = {"date": target_date, "station": station_id, "rows": rows}
 with open(f"data/{target_date}.json", "w") as f:
-    json.dump(output, f, separators=(",", ":"))
+    json.dump(archive_output, f, separators=(",", ":"))
 print(f"  ✓ Archive: data/{target_date}.json")
