@@ -1,5 +1,5 @@
 // sw.js — Solar Energy Monitor Service Worker
-const CACHE = 'solar-monitor-v2';
+const CACHE = 'solar-monitor-v3';
 const SHELL = ['./manifest.json'];
 
 self.addEventListener('install', e => {
