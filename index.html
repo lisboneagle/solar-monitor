@@ -1275,9 +1275,25 @@ let mainChart, socChart, donutChart, barChart;
 // ============================================================
 // HELPERS
 // ============================================================
+// ── SAST helpers (UTC+2, no DST) ────────────────────────────
+function nowSAST() {
+  const now = new Date();
+  return new Date(now.getTime() + (2 * 60 - now.getTimezoneOffset()) * 60000);
+}
+function dateToKeySAST() {
+  const s = nowSAST();
+  return `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
+}
+function nowHourSAST() {
+  const s = nowSAST();
+  return s.getHours() + s.getMinutes() / 60;
+}
+// ────────────────────────────────────────────────────────────
+
 function fmtTime(t) {
-  const d = new Date(t.replace(' ', 'T'));
-  return d.toTimeString().slice(0, 5);
+  // Timestamps from API are SAST — extract HH:MM directly, no Date() conversion
+  const s = t.replace(' ', 'T');
+  return s.slice(11, 16);
 }
 function idxToTime(idx) {
   if (idx >= DATA.length) return '24:00';
@@ -1359,7 +1375,7 @@ function resetPeriod() {
 }
 
 function getPeriodDateRange() {
-  const now = new Date();
+  const now = nowSAST();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   if (currentPeriod === 'day') {
@@ -1420,7 +1436,7 @@ async function loadPeriodData() {
 
   try {
     const range = getPeriodDateRange();
-    const todayKey = dateToKey(new Date());
+    const todayKey = dateToKeySAST();
     document.getElementById('periodLabel').textContent = range.label;
 
     // Save today's data on first load so we can restore it later
@@ -2102,7 +2118,7 @@ function renderInsights() {
           // Get today's sunrise from Open-Meteo weather data if available
           let sunriseStr = '';
           if (wxData && wxData.daily && wxData.daily.sunrise) {
-            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayStr = dateToKeySAST();
             const todayIdx = wxData.daily.time.indexOf(todayStr);
             if (todayIdx >= 0 && wxData.daily.sunrise[todayIdx]) {
               const sr = new Date(wxData.daily.sunrise[todayIdx]);
@@ -2520,7 +2536,7 @@ function setWxTab(tab) {
 function renderSolarInfoBar() {
   if (!wxData || !wxData.daily) return;
   const d        = wxData.daily;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = dateToKeySAST();
   const idx      = d.time.indexOf(todayStr);
   if (idx < 0) return;
 
@@ -2592,7 +2608,7 @@ function renderWeather() {
   if (!wxData) return;
   renderSolarInfoBar();
   const d = wxData.daily;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToKeySAST();
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const themeClass = `theme-${wxTab}`;
   const accentColor = WX_TAB_COLORS[wxTab];
@@ -2894,7 +2910,7 @@ function getHourlyConsumptionProfile() {
 function getForecastSolarProfile() {
   if (!wxData || !wxData.daily) return null;
   const d        = wxData.daily;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = dateToKeySAST();
   const todayIdx = d.time.indexOf(todayStr);
 
   // Get today and tomorrow cloud/UV
@@ -2926,7 +2942,7 @@ function getForecastSolarProfile() {
 
 function findBestWindows(solarProfile, consProfile, durationHours, applianceKw) {
   const windows = [];
-  const nowHour = new Date().getHours() + new Date().getMinutes() / 60;
+  const nowHour = nowHourSAST();
 
   for (let startH = 6; startH <= 20 - durationHours; startH += 0.5) {
     // Only future windows for today
@@ -2999,8 +3015,8 @@ async function renderLoadShifting() {
   const solarProfile = getHourlySolarProfile();
   const consProfile  = getHourlyConsumptionProfile();
   const forecasts    = getForecastSolarProfile();
-  const now          = new Date();
-  const nowHour      = now.getHours() + now.getMinutes() / 60;
+  const now          = nowSAST();
+  const nowHour      = nowHourSAST();
 
   const sectionHead = (text) =>
     `<div style="font-size:0.95rem;font-weight:700;color:#F1F5F9;margin-bottom:10px;padding:8px 12px;border-radius:6px;background:linear-gradient(135deg,rgba(29,78,216,0.25) 0%,rgba(14,165,233,0.15) 100%);border-left:3px solid #3B82F6;">${text}</div>`;
@@ -3020,7 +3036,7 @@ async function renderLoadShifting() {
   const todayCloud = forecasts?.today?.cloud ?? null;
   const todayEff   = forecasts?.today ? Math.round(forecasts.today.efficiency * 100) : null;
   const todayWx    = wxData?.daily?.weathercode
-    ? wxCodeInfo(wxData.daily.weathercode[wxData.daily.time.indexOf(now.toISOString().slice(0,10))] ?? 0)
+    ? wxCodeInfo(wxData.daily.weathercode[wxData.daily.time.indexOf(dateToKeySAST())] ?? 0)
     : { icon: '☀️' };
   const todaySub   = todayCloud !== null ? ` · ${todayCloud}% cloud · ${todayEff}% efficiency` : '';
   left += sectionHead(`${todayWx.icon} Today — ${todayLabel}${todaySub}`);
