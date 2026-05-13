@@ -223,6 +223,8 @@ try:
                         [latest_block])
 
     for item in latest_items:
+        # Print ALL fields to find the correct load field name
+        print(f"  📋 ALL station/latest fields: {json.dumps(item, default=str)[:1500]}")
         raw_t = (item.get("lastUpdateTime") or
                  item.get("timeStamp") or
                  item.get("updateTime") or
