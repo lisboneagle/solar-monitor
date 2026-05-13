@@ -720,6 +720,70 @@
   <button class="apply-btn" onclick="applyColumnMap()">✅ Apply & Load Dashboard</button>
 </div>
 
+<!-- POWER FLOW DIAGRAM -->
+<div style="background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:14px 28px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="togglePowerFlow()">
+    <div class="insights-title" style="margin-bottom:0">⚡ Live Power Flow</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:0.7rem;color:#475569" id="powerFlowHint">tap to expand</span>
+      <div id="powerFlowArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
+    </div>
+  </div>
+  <div id="powerFlowBody" style="max-height:0;overflow:hidden;transition:max-height 0.4s ease,opacity 0.3s ease;opacity:0;">
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:center;">
+      <svg id="powerFlowSVG" viewBox="0 0 340 300" width="100%" style="max-width:420px;overflow:visible;">
+
+        <!-- GRID LINES / PATHS -->
+        <!-- Solar → Inverter -->
+        <line id="pf-line-solar" x1="80" y1="60" x2="170" y2="140" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Grid → Inverter -->
+        <line id="pf-line-grid" x1="260" y1="60" x2="170" y2="140" stroke="#F5276C" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Inverter → Battery -->
+        <line id="pf-line-battery" x1="170" y1="160" x2="80" y2="240" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round"/>
+        <!-- Inverter → Load -->
+        <line id="pf-line-load" x1="170" y1="160" x2="260" y2="240" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round"/>
+
+        <!-- ANIMATED DOTS -->
+        <circle id="dot-solar"   r="5" fill="#22C55E" opacity="0.9"/>
+        <circle id="dot-grid"    r="5" fill="#F5276C"  opacity="0.9"/>
+        <circle id="dot-battery" r="5" fill="#8B5CF6" opacity="0.9"/>
+        <circle id="dot-load"    r="5" fill="#EAB308"  opacity="0.9"/>
+
+        <!-- SOLAR NODE -->
+        <circle cx="80" cy="45" r="32" fill="#0F2744" stroke="#22C55E" stroke-width="2"/>
+        <text x="80" y="38" text-anchor="middle" font-size="18">☀️</text>
+        <text x="80" y="52" text-anchor="middle" fill="#22C55E" font-size="9" font-weight="700" id="pf-val-solar">0.00 kW</text>
+        <text x="80" y="63" text-anchor="middle" fill="#64748B" font-size="7">Solar</text>
+
+        <!-- GRID NODE -->
+        <circle cx="260" cy="45" r="32" fill="#0F2744" stroke="#F5276C" stroke-width="2" id="pf-circle-grid"/>
+        <text x="260" y="38" text-anchor="middle" font-size="18">⚡</text>
+        <text x="260" y="52" text-anchor="middle" fill="#F5276C" font-size="9" font-weight="700" id="pf-val-grid">0.00 kW</text>
+        <text x="260" y="63" text-anchor="middle" fill="#64748B" font-size="7">Grid</text>
+
+        <!-- INVERTER NODE (centre) -->
+        <rect x="140" y="130" width="60" height="40" rx="8" fill="#1E293B" stroke="#3B82F6" stroke-width="2"/>
+        <text x="170" y="147" text-anchor="middle" fill="#3B82F6" font-size="8" font-weight="700">INVERTER</text>
+        <text x="170" y="160" text-anchor="middle" fill="#64748B" font-size="7" id="pf-val-soc">SOC 0%</text>
+
+        <!-- BATTERY NODE -->
+        <circle cx="80" cy="255" r="32" fill="#0F2744" stroke="#8B5CF6" stroke-width="2" id="pf-circle-battery"/>
+        <text x="80" y="248" text-anchor="middle" font-size="18">🔋</text>
+        <text x="80" y="262" text-anchor="middle" fill="#8B5CF6" font-size="9" font-weight="700" id="pf-val-battery">0.00 kW</text>
+        <text x="80" y="273" text-anchor="middle" fill="#64748B" font-size="7" id="pf-label-battery">Battery</text>
+
+        <!-- LOAD / CONSUMPTION NODE -->
+        <circle cx="260" cy="255" r="32" fill="#0F2744" stroke="#EAB308" stroke-width="2"/>
+        <text x="260" y="248" text-anchor="middle" font-size="18">🏠</text>
+        <text x="260" y="262" text-anchor="middle" fill="#EAB308" font-size="9" font-weight="700" id="pf-val-load">0.00 kW</text>
+        <text x="260" y="273" text-anchor="middle" fill="#64748B" font-size="7">Load</text>
+
+      </svg>
+    </div>
+    <div style="text-align:center;font-size:0.65rem;color:#475569;margin-top:4px;" id="powerFlowTimestamp">—</div>
+  </div>
+</div>
+
 <div class="main">
 
   <!-- PERIOD FILTER -->
@@ -1660,6 +1724,7 @@ function renderKPIs() {
       <div class="kpi-sub">${c.sub}</div>
     </div>`).join('');
   updateStatusBadge();
+  if (powerFlowOpen) updatePowerFlowDiagram();
 }
 
 // ============================================================
@@ -2549,8 +2614,136 @@ function renderWeather() {
 
 
 // ============================================================
-// ACCORDION TOGGLES
+// POWER FLOW DIAGRAM
 // ============================================================
+let powerFlowOpen = false;
+let powerFlowAnimFrame = null;
+
+function togglePowerFlow() {
+  powerFlowOpen = !powerFlowOpen;
+  const body  = document.getElementById('powerFlowBody');
+  const arrow = document.getElementById('powerFlowArrow');
+  const hint  = document.getElementById('powerFlowHint');
+  if (powerFlowOpen) {
+    body.style.maxHeight = '400px';
+    body.style.opacity   = '1';
+    arrow.innerHTML      = '⬆️';
+    hint.textContent     = 'tap to collapse';
+    updatePowerFlowDiagram();
+    startPowerFlowAnimation();
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.innerHTML      = 'ℹ️';
+    hint.textContent     = 'tap to expand';
+    if (powerFlowAnimFrame) cancelAnimationFrame(powerFlowAnimFrame);
+  }
+}
+
+function updatePowerFlowDiagram() {
+  if (!DATA || DATA.length === 0) return;
+  const last = DATA[DATA.length - 1];
+
+  const solar   = Math.max(0, last.pv_kw         || 0);
+  const grid    = last.grid_kw    || 0;
+  const battery = last.battery_kw || 0;  // negative=charging, positive=discharging
+  const load    = Math.max(0, last.consumption_kw || 0);
+  const soc     = last.soc_pct    || 0;
+  const time    = last.time       || '';
+
+  // Update values
+  document.getElementById('pf-val-solar').textContent   = solar.toFixed(2) + ' kW';
+  document.getElementById('pf-val-grid').textContent    = Math.abs(grid).toFixed(2) + ' kW';
+  document.getElementById('pf-val-battery').textContent = Math.abs(battery).toFixed(2) + ' kW';
+  document.getElementById('pf-val-load').textContent    = load.toFixed(2) + ' kW';
+  document.getElementById('pf-val-soc').textContent     = 'SOC ' + soc + '%';
+  document.getElementById('pf-label-battery').textContent = battery < -0.05 ? 'Charging' : battery > 0.05 ? 'Discharging' : 'Battery';
+  document.getElementById('powerFlowTimestamp').textContent = 'Last reading: ' + time.slice(11, 16) + ' SAST';
+
+  // Grid: green border if exporting, red if importing, grey if idle
+  const gridCircle = document.getElementById('pf-circle-grid');
+  gridCircle.setAttribute('stroke', grid > 0.05 ? '#F5276C' : grid < -0.05 ? '#22C55E' : '#334155');
+
+  // Battery: purple charging, teal discharging, grey idle
+  const batCircle = document.getElementById('pf-circle-battery');
+  batCircle.setAttribute('stroke', battery < -0.05 ? '#8B5CF6' : battery > 0.05 ? '#14B8A6' : '#334155');
+
+  // Line colours / opacity based on flow
+  setLineState('pf-line-solar',   solar   > 0.05, '#22C55E');
+  setLineState('pf-line-grid',    Math.abs(grid) > 0.05, grid > 0 ? '#F5276C' : '#22C55E');
+  setLineState('pf-line-battery', Math.abs(battery) > 0.05, battery < 0 ? '#8B5CF6' : '#14B8A6');
+  setLineState('pf-line-load',    load    > 0.05, '#EAB308');
+}
+
+function setLineState(id, active, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.setAttribute('stroke', active ? color : '#1E293B');
+  el.setAttribute('stroke-width', active ? '2.5' : '1');
+}
+
+// Animate dots along paths
+const PF_PATHS = [
+  { dotId: 'dot-solar',   x1:80,  y1:60,  x2:170, y2:140, dataFn: () => { const l = DATA[DATA.length-1]; return Math.max(0, l?.pv_kw||0); }, color:'#22C55E', reverse: false },
+  { dotId: 'dot-grid',    x1:260, y1:60,  x2:170, y2:140, dataFn: () => { const l = DATA[DATA.length-1]; return Math.abs(l?.grid_kw||0); },  color:'#F5276C',  reverse: false },
+  { dotId: 'dot-battery', x1:170, y1:160, x2:80,  y2:240, dataFn: () => { const l = DATA[DATA.length-1]; return Math.abs(l?.battery_kw||0); }, color:'#8B5CF6', reverse: false },
+  { dotId: 'dot-load',    x1:170, y1:160, x2:260, y2:240, dataFn: () => { const l = DATA[DATA.length-1]; return Math.max(0, l?.consumption_kw||0); }, color:'#EAB308', reverse: false },
+];
+
+const dotProgress = { 'dot-solar': 0, 'dot-grid': 0, 'dot-battery': 0, 'dot-load': 0 };
+
+function startPowerFlowAnimation() {
+  if (powerFlowAnimFrame) cancelAnimationFrame(powerFlowAnimFrame);
+
+  function animate() {
+    if (!powerFlowOpen) return;
+
+    PF_PATHS.forEach(p => {
+      const val  = p.dataFn();
+      const dot  = document.getElementById(p.dotId);
+      if (!dot) return;
+
+      if (val < 0.05) {
+        dot.setAttribute('opacity', '0');
+        return;
+      }
+
+      // Reverse direction for battery charging (inverter → battery)
+      let fromX = p.x1, fromY = p.y1, toX = p.x2, toY = p.y2;
+
+      // Battery: charging = inverter→battery, discharging = battery→inverter
+      if (p.dotId === 'dot-battery') {
+        const last = DATA[DATA.length-1];
+        const bv = last?.battery_kw || 0;
+        if (bv > 0.05) { fromX = p.x2; fromY = p.y2; toX = p.x1; toY = p.y1; } // discharging
+      }
+      // Grid: importing = grid→inverter, exporting = inverter→grid
+      if (p.dotId === 'dot-grid') {
+        const last = DATA[DATA.length-1];
+        const gv = last?.grid_kw || 0;
+        if (gv < -0.05) { fromX = p.x2; fromY = p.y2; toX = p.x1; toY = p.y1; } // exporting
+      }
+
+      const speed = Math.min(val / 5, 1) * 0.008 + 0.002;
+      dotProgress[p.dotId] = (dotProgress[p.dotId] + speed) % 1;
+      const t = dotProgress[p.dotId];
+
+      const x = fromX + (toX - fromX) * t;
+      const y = fromY + (toY - fromY) * t;
+
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      dot.setAttribute('opacity', '0.9');
+      dot.setAttribute('fill', p.color);
+    });
+
+    powerFlowAnimFrame = requestAnimationFrame(animate);
+  }
+
+  animate();
+}
+
+
 let loadShiftOpen = false;
 let insightsOpen  = false;
 
