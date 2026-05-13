@@ -144,13 +144,17 @@ FIELD_MAP = {
     "purchasePower":    "grid_kw",
     "wirePower":        "grid_kw",
     "gridPower":        "grid_kw",
+    "gridConsumptionPower": "grid_kw",
+    "uploadPower":      "grid_kw",       # grid export (negative)
     "batteryPower":     "battery_kw",
     "dischargePower":   "battery_kw",
+    "chargePower":      "battery_kw",
     "batterySOC":       "soc_pct",
     "SOC":              "soc_pct",
     "soc":              "soc_pct",
     "batterySoc":       "soc_pct",
     "pvPower":          "pv_kw",
+    "pvGeneratePower":  "pv_kw",
     "generatorPower":   "generator_kw",
 }
 
@@ -240,12 +244,17 @@ try:
             print(f"  ⚠ Latest record date {time_str[:10]} doesn't match target {target_date} — skipping")
             continue
 
-        # Only append if more recent than last history record
-        if not rows or time_str > rows[-1]["time"]:
+        # Always append/overwrite with latest if it's same time or newer
+        # This ensures the most recent inverter reading is always reflected
+        if not rows or time_str >= rows[-1]["time"]:
+            # Remove existing record at same timestamp if present
+            rows = [r for r in rows if r["time"] != time_str]
             rows.append(normalise(item, time_str))
-            print(f"  ✓ Appended latest record at {time_str}")
+            print(f"  ✓ Latest record added at {time_str}")
         else:
-            print(f"  ℹ Latest record ({time_str}) already covered by history — skipping")
+            # Replace the last row with latest data regardless — it's more accurate
+            rows[-1] = normalise(item, time_str)
+            print(f"  ✓ Latest record replaced last row ({time_str})")
 
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
