@@ -756,33 +756,11 @@
         <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="242" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
         <line id="pfl-load"  x1="187" y1="175" x2="260" y2="242" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
 
-        <!-- ═══ TRAVELLING ARROWHEADS (animateMotion) ═══ -->
-        <polygon id="pfarr-solar" points="-5,-4 6,0 -5,4" fill="#22C55E" opacity="0.9">
-          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#pfpath-solar"/>
-          </animateMotion>
-        </polygon>
-        <polygon id="pfarr-grid" points="-5,-4 6,0 -5,4" fill="#F5276C" opacity="0.9">
-          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#pfpath-grid"/>
-          </animateMotion>
-        </polygon>
-        <polygon id="pfarr-bat" points="-5,-4 6,0 -5,4" fill="#8B5CF6" opacity="0.9">
-          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#pfpath-bat"/>
-          </animateMotion>
-        </polygon>
-        <polygon id="pfarr-load" points="-5,-4 6,0 -5,4" fill="#EAB308" opacity="0.9">
-          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
-            <mpath href="#pfpath-load"/>
-          </animateMotion>
-        </polygon>
-
-        <!-- ═══ NAMED PATHS for animateMotion ═══ -->
-        <path id="pfpath-solar" d="M80,76 L153,148"  fill="none" stroke="none"/>
-        <path id="pfpath-grid"  d="M260,76 L187,148" fill="none" stroke="none"/>
-        <path id="pfpath-bat"   d="M153,175 L75,242"  fill="none" stroke="none"/>
-        <path id="pfpath-load"  d="M187,175 L260,242" fill="none" stroke="none"/>
+        <!-- ═══ JS-DRIVEN ANIMATED DOTS ═══ -->
+        <circle id="pfd-solar" r="5" fill="#22C55E" opacity="0"/>
+        <circle id="pfd-grid"  r="5" fill="#F5276C"  opacity="0"/>
+        <circle id="pfd-bat"   r="5" fill="#8B5CF6"  opacity="0"/>
+        <circle id="pfd-load"  r="5" fill="#EAB308"  opacity="0"/>
 
         <!-- ═══ SOLAR NODE ═══ -->
         <circle cx="80" cy="52" r="34" fill="#0A1628" stroke="#22C55E" stroke-width="2"/>
@@ -2701,104 +2679,110 @@ function updatePowerFlowDiagram() {
   const last = DATA[DATA.length - 1];
 
   const solar   = Math.max(0, last.pv_kw         || 0);
-  const grid    = last.grid_kw    || 0;  // positive=import, negative=export
+  const grid    = last.grid_kw    || 0;
   const battery = last.battery_kw || 0;  // negative=charging, positive=discharging
-  const load    = Math.max(0, last.consumption_kw || 0);
   const soc     = last.soc_pct    || 0;
   const time    = last.time       || '';
 
-  // Helper: set line weight, colour, animation class and marker
-  function setLine(id, active, kw, colour, markerId, reverse) {
+  // Home load: use consumption_kw if > 0, else calculate from energy balance
+  let load = last.consumption_kw || 0;
+  if (load < 0.05) {
+    // Fallback: solar + grid_import + battery_discharge - battery_charge
+    const gridIn  = Math.max(0, grid);
+    const batDis  = Math.max(0, battery);
+    const batCh   = Math.max(0, -battery);
+    load = Math.max(0, solar + gridIn + batDis - batCh);
+  }
+
+  const gridImport    = grid > 0.05;
+  const gridExport    = grid < -0.05;
+  const batCharging   = battery < -0.05;
+  const batDischarging = battery > 0.05;
+  const batActive     = batCharging || batDischarging;
+  const batKw         = Math.abs(battery);
+
+  // Line thickness: thin, proportional but capped — max 3.5px
+  function lineW(kw) { return Math.max(1.5, Math.min(3.5, kw * 0.5 + 1.2)); }
+
+  function setLine(id, active, kw, colour, cls) {
     const el = document.getElementById(id);
     if (!el) return;
-    const w = active ? Math.max(1.5, Math.min(6, kw * 1.2 + 1)) : 1;
     el.setAttribute('stroke', active ? colour : '#1E293B');
-    el.setAttribute('stroke-width', w);
-    el.setAttribute('marker-end', active ? `url(#${markerId})` : 'url(#mIdle)');
-    el.className.baseVal = active ? (reverse ? 'pf-dash-rev' : 'pf-dash') : 'pf-idle';
+    el.setAttribute('stroke-width', active ? lineW(kw) : 1);
+    el.className.baseVal = active ? cls : 'pf-idle';
   }
 
-  // Solar → Inverter (always forward when active)
-  setLine('pfl-solar', solar > 0.05, solar, '#22C55E', 'mSolar', false);
+  setLine('pfl-solar', solar > 0.05, solar, '#22C55E', 'pf-dash');
+  setLine('pfl-grid',  gridImport || gridExport, Math.abs(grid),
+    gridImport ? '#F5276C' : '#22C55E',
+    gridExport ? 'pf-dash-rev' : 'pf-dash');
+  setLine('pfl-bat', batActive, batKw,
+    batCharging ? '#8B5CF6' : '#14B8A6',
+    batDischarging ? 'pf-dash-rev' : 'pf-dash');
+  setLine('pfl-load', load > 0.05, load, '#EAB308', 'pf-dash');
 
-  // Grid: import = grid→inverter (forward), export = inverter→grid (reverse, green)
-  const gridImport = grid > 0.05;
-  const gridExport = grid < -0.05;
-  const gridEl = document.getElementById('pfl-grid');
-  if (gridEl) {
-    const gActive = gridImport || gridExport;
-    const gKw = Math.abs(grid);
-    const gW = gActive ? Math.max(1.5, Math.min(6, gKw * 1.2 + 1)) : 1;
-    gridEl.setAttribute('stroke', gridImport ? '#F5276C' : gridExport ? '#22C55E' : '#1E293B');
-    gridEl.setAttribute('stroke-width', gW);
-    gridEl.setAttribute('marker-end', gridImport ? 'url(#mGrid)' : gridExport ? 'url(#mGrExp)' : 'url(#mIdle)');
-    gridEl.className.baseVal = gActive ? (gridExport ? 'pf-dash-rev' : 'pf-dash') : 'pf-idle';
-  }
-
-  // Battery: charging = inverter→battery (forward, purple), discharging = battery→inverter (reverse, teal)
-  const batCharging    = battery < -0.05;
-  const batDischarging = battery >  0.05;
-  const batActive      = batCharging || batDischarging;
-  const batKw          = Math.abs(battery);
-  const batEl = document.getElementById('pfl-bat');
-  if (batEl) {
-    const bW = batActive ? Math.max(1.5, Math.min(6, batKw * 1.2 + 1)) : 1;
-    batEl.setAttribute('stroke', batCharging ? '#8B5CF6' : batDischarging ? '#14B8A6' : '#1E293B');
-    batEl.setAttribute('stroke-width', bW);
-    batEl.setAttribute('marker-end', batCharging ? 'url(#mBatCh)' : batDischarging ? 'url(#mBatDis)' : 'url(#mIdle)');
-    batEl.className.baseVal = batActive ? (batDischarging ? 'pf-dash-rev' : 'pf-dash') : 'pf-idle';
-  }
-
-  // Load → always from inverter
-  setLine('pfl-load', load > 0.05, load, '#EAB308', 'mLoad', false);
-
-  // Update node values
-  document.getElementById('pf-val-solar').textContent   = solar.toFixed(2) + ' kW';
-  document.getElementById('pf-val-grid').textContent    = Math.abs(grid).toFixed(2) + ' kW';
-  document.getElementById('pf-label-grid').textContent  = gridExport ? 'Grid Export' : 'Grid Import';
+  // Node values
+  document.getElementById('pf-val-solar').textContent  = solar.toFixed(2) + ' kW';
+  document.getElementById('pf-val-grid').textContent   = Math.abs(grid).toFixed(2) + ' kW';
+  document.getElementById('pf-label-grid').textContent = gridExport ? 'Grid Export' : 'Grid Import';
   document.getElementById('pf-node-grid').setAttribute('stroke', gridExport ? '#22C55E' : '#F5276C');
-  const gridValEl = document.getElementById('pf-val-grid');
-  if (gridValEl) gridValEl.setAttribute('fill', gridExport ? '#22C55E' : '#F5276C');
+  const gv = document.getElementById('pf-val-grid');
+  if (gv) gv.setAttribute('fill', gridExport ? '#22C55E' : '#F1F5F9');
+  document.getElementById('pf-val-load').textContent   = load.toFixed(2) + ' kW';
 
-  // Battery fill bar proportional to SOC
+  // Battery fill
   const batFill = document.getElementById('pf-bat-fill');
   if (batFill) {
-    const fillW = Math.round((soc / 100) * 52);
-    batFill.setAttribute('width', fillW);
-    // Colour: green >60%, amber 30-60%, red <30%
-    const batColour = soc >= 60 ? '#10B981' : soc >= 30 ? '#F59E0B' : '#EF4444';
-    batFill.setAttribute('fill', batColour);
-    document.getElementById('pf-bat-border').setAttribute('stroke', batColour);
+    batFill.setAttribute('width', Math.round((soc / 100) * 52));
+    const bc = soc >= 60 ? '#10B981' : soc >= 30 ? '#F59E0B' : '#EF4444';
+    batFill.setAttribute('fill', bc);
+    document.getElementById('pf-bat-border').setAttribute('stroke', bc);
   }
-  document.getElementById('pf-val-soc').textContent     = soc + '%';
-  document.getElementById('pf-label-bat').textContent   = batCharging ? 'Charging' : batDischarging ? 'Discharging' : 'Battery';
-  document.getElementById('pf-val-bat-kw').textContent  = batKw.toFixed(2) + ' kW';
-  // Update arrowhead paths for correct direction
-  function setArrowPath(pathId, x1, y1, x2, y2, reverse) {
-    const p = document.getElementById(pathId);
-    if (!p) return;
-    if (reverse) p.setAttribute('d', `M${x2},${y2} L${x1},${y1}`);
-    else         p.setAttribute('d', `M${x1},${y1} L${x2},${y2}`);
-  }
-  setArrowPath('pfpath-solar', 80, 76, 153, 148, false);
-  setArrowPath('pfpath-grid',  260, 76, 187, 148, gridExport);
-  setArrowPath('pfpath-bat',   153, 175, 75, 242, batDischarging);
-  setArrowPath('pfpath-load',  187, 175, 260, 242, false);
+  document.getElementById('pf-val-soc').textContent    = soc + '%';
+  document.getElementById('pf-label-bat').textContent  = batCharging ? 'Charging' : batDischarging ? 'Discharging' : 'Battery';
+  document.getElementById('pf-val-bat-kw').textContent = batKw.toFixed(2) + ' kW';
+  document.getElementById('powerFlowTimestamp').textContent = 'Last reading: ' + time.slice(11, 16) + ' SAST';
 
-  // Hide arrowheads on idle lines
-  document.getElementById('pfarr-solar').setAttribute('opacity', solar > 0.05 ? '0.9' : '0');
-  document.getElementById('pfarr-grid').setAttribute('opacity',  (gridImport||gridExport) ? '0.9' : '0');
-  document.getElementById('pfarr-bat').setAttribute('opacity',   batActive ? '0.9' : '0');
-  document.getElementById('pfarr-load').setAttribute('opacity',  load > 0.05 ? '0.9' : '0');
-
-  // Arrowhead fill colours
-  document.getElementById('pfarr-grid').setAttribute('fill', gridExport ? '#22C55E' : '#F5276C');
-  document.getElementById('pfarr-bat').setAttribute('fill',  batDischarging ? '#14B8A6' : '#8B5CF6');
-
+  // Store state for animation
+  window._pfState = { solar, grid, battery: batKw, load, batCharging, batDischarging, gridImport, gridExport };
 }
 
+// JS-driven dot animation — reliable cross-browser
+const PF_DOTS = [
+  { id: 'pfd-solar', x1:80,  y1:76,  x2:153, y2:148, stateKey: 'solar',   colour: '#22C55E', reverse: () => false },
+  { id: 'pfd-grid',  x1:260, y1:76,  x2:187, y2:148, stateKey: 'grid',    colour: '#F5276C', reverse: () => window._pfState?.gridExport,  altColour: () => window._pfState?.gridExport ? '#22C55E' : '#F5276C' },
+  { id: 'pfd-bat',   x1:153, y1:175, x2:75,  y2:242, stateKey: 'battery', colour: '#8B5CF6', reverse: () => window._pfState?.batDischarging, altColour: () => window._pfState?.batDischarging ? '#14B8A6' : '#8B5CF6' },
+  { id: 'pfd-load',  x1:187, y1:175, x2:260, y2:242, stateKey: 'load',    colour: '#EAB308', reverse: () => false },
+];
+const dotPos = { 'pfd-solar': 0, 'pfd-grid': 0.33, 'pfd-bat': 0.66, 'pfd-load': 0.1 };
+
 function startPowerFlowAnimation() {
-  // Animation now handled by CSS stroke-dasharray on the lines — no JS loop needed
+  if (powerFlowAnimFrame) cancelAnimationFrame(powerFlowAnimFrame);
+
+  function frame() {
+    if (!powerFlowOpen) return;
+    const state = window._pfState || {};
+
+    PF_DOTS.forEach(p => {
+      const dot = document.getElementById(p.id);
+      if (!dot) return;
+      const kw = state[p.stateKey] || 0;
+      if (kw < 0.05) { dot.setAttribute('opacity', '0'); return; }
+
+      // Speed proportional to kW: min 0.004, max 0.018 per frame
+      const speed = Math.min(0.018, Math.max(0.004, kw / 8 * 0.014 + 0.004));
+      dotPos[p.id] = (dotPos[p.id] + speed) % 1;
+      const t = p.reverse() ? 1 - dotPos[p.id] : dotPos[p.id];
+
+      dot.setAttribute('cx', p.x1 + (p.x2 - p.x1) * t);
+      dot.setAttribute('cy', p.y1 + (p.y2 - p.y1) * t);
+      dot.setAttribute('opacity', '1');
+      dot.setAttribute('fill', p.altColour ? p.altColour() : p.colour);
+    });
+
+    powerFlowAnimFrame = requestAnimationFrame(frame);
+  }
+  frame();
 }
 
 
