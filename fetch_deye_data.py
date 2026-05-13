@@ -140,11 +140,14 @@ if len(raw_records) == 0:
 FIELD_MAP = {
     "generationPower":  "production_kw",
     "productionPower":  "production_kw",
+    # consumption — these are ADDITIVE: UPS load + non-UPS home load = total load
+    # They are kept separate here and summed in normalise()
     "consumptionPower": "consumption_kw",
-    "upsPower":         "consumption_kw",
-    "upsLoadPower":     "consumption_kw",
     "loadPower":        "consumption_kw",
     "acOutputPower":    "consumption_kw",
+    # UPS / backed-up load — separate circuit on Deye, must be ADDED to consumption
+    "upsPower":         "ups_kw",
+    "upsLoadPower":     "ups_kw",
     "purchasePower":    "grid_kw",
     "wirePower":        "grid_kw",
     "gridPower":        "grid_kw",
@@ -171,12 +174,13 @@ def unix_to_timestr(ts):
         return str(ts)
 
 # These fields are always in watts from the Deye API → convert to kW
-WATT_FIELDS = {"production_kw", "consumption_kw", "grid_kw", "battery_kw", "pv_kw", "generator_kw"}
+WATT_FIELDS = {"production_kw", "consumption_kw", "ups_kw", "grid_kw", "battery_kw", "pv_kw", "generator_kw"}
 
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
            "pv_kw": 0.0, "generator_kw": 0, "grid_inverter_kw": 0}
+    ups_kw = 0.0
     for k, dk in FIELD_MAP.items():
         if k in r and r[k] is not None:
             try:
@@ -184,9 +188,16 @@ def normalise(r, time_str):
                 # Always convert W → kW for power fields
                 if dk in WATT_FIELDS:
                     val = round(val / 1000, 3)
-                out[dk] = val
+                if dk == "ups_kw":
+                    ups_kw += val   # accumulate UPS load separately
+                else:
+                    out[dk] = val
             except (ValueError, TypeError):
                 pass
+    # Sum UPS load into total consumption — they are separate circuits on Deye
+    if ups_kw > 0:
+        out["consumption_kw"] = round(out["consumption_kw"] + ups_kw, 3)
+        print(f"    \u2139 UPS load {ups_kw:.3f} kW + non-UPS {out['consumption_kw'] - ups_kw:.3f} kW = total {out['consumption_kw']:.3f} kW")
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]

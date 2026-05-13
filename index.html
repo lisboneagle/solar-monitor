@@ -2707,8 +2707,9 @@ function updatePowerFlowDiagram() {
   const batCh    = Math.max(0, -battery);  // charging (negative→positive)
   const calcLoad = Math.max(0, solar + gridIn + batDis - batCh);
   let load = last.consumption_kw || 0;
-  // Use calculated value if consumption_kw is suspiciously low vs calculated
-  if (load < calcLoad * 0.5 && calcLoad > 0.1) {
+  // Prefer energy-balance if API consumption looks wrong (zero while system is active,
+  // or less than 40% of what physics dictates)
+  if (calcLoad > 0.1 && (load === 0 || load < calcLoad * 0.4)) {
     load = calcLoad;
   }
 
