@@ -2772,10 +2772,10 @@ function startPowerFlowAnimation() {
       const dot = document.getElementById(p.id);
       if (!dot) return;
       const kw = state[p.stateKey] || 0;
-      if (kw < 0.05) { dot.setAttribute('opacity', '0'); return; }
+      if (Math.abs(kw) < 0.01) { dot.setAttribute('opacity', '0'); return; }
 
       // Speed proportional to kW: min 0.004, max 0.018 per frame
-      const speed = Math.min(0.018, Math.max(0.004, kw / 8 * 0.014 + 0.004));
+      const speed = Math.min(0.018, Math.max(0.004, Math.abs(kw) / 8 * 0.014 + 0.004));
       dotPos[p.id] = (dotPos[p.id] + speed) % 1;
       const t = p.reverse() ? 1 - dotPos[p.id] : dotPos[p.id];
 
