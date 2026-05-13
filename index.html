@@ -3156,7 +3156,7 @@ async function init() {
   let loaded = false;
 
   try {
-    const resp = await fetch("data/latest.json", { cache: "no-store" });
+    const resp = await fetch(`data/latest.json?t=${Date.now()}`, { cache: "no-store" });
     if (resp.ok) {
       const json = await resp.json();
       const rows = json.rows || json;
