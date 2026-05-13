@@ -734,11 +734,11 @@
       <svg id="powerFlowSVG" viewBox="0 0 340 320" width="100%" style="max-width:440px;">
         <defs>
           <style>
-            .pf-dash     { stroke-dasharray:8 5; animation:pf-fwd 1.2s linear infinite; }
-            .pf-dash-rev { stroke-dasharray:8 5; animation:pf-rev 1.2s linear infinite; }
-            .pf-idle     { stroke-dasharray:4 6; animation:none; opacity:0.25; }
-            @keyframes pf-fwd { to { stroke-dashoffset:-13; } }
-            @keyframes pf-rev { to { stroke-dashoffset: 13; } }
+            .pf-dash     { stroke-dasharray:10 6; animation:pf-fwd 1.0s linear infinite; }
+            .pf-dash-rev { stroke-dasharray:10 6; animation:pf-rev 1.0s linear infinite; }
+            .pf-idle     { stroke-dasharray:4 8;  animation:none; opacity:0.18; }
+            @keyframes pf-fwd { from{stroke-dashoffset:16;} to{stroke-dashoffset:0;} }
+            @keyframes pf-rev { from{stroke-dashoffset:0;}  to{stroke-dashoffset:16;} }
           </style>
           <marker id="mSolar"  markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <marker id="mGrid"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#F5276C"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
@@ -751,22 +751,50 @@
         </defs>
 
         <!-- ═══ LINES (behind nodes) ═══ -->
-        <line id="pfl-solar" x1="80"  y1="76"  x2="153" y2="148" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" class="pf-dash" marker-end="url(#mSolar)"/>
-        <line id="pfl-grid"  x1="260" y1="76"  x2="187" y2="148" stroke="#F5276C" stroke-width="2.5" stroke-linecap="round" class="pf-dash" marker-end="url(#mGrid)"/>
-        <line id="pfl-bat"   x1="153" y1="175" x2="80"  y2="242" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash" marker-end="url(#mBatCh)"/>
-        <line id="pfl-load"  x1="187" y1="175" x2="260" y2="242" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round" class="pf-dash" marker-end="url(#mLoad)"/>
+        <line id="pfl-solar" x1="80"  y1="76"  x2="153" y2="148" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+        <line id="pfl-grid"  x1="260" y1="76"  x2="187" y2="148" stroke="#F5276C" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+        <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="242" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+        <line id="pfl-load"  x1="187" y1="175" x2="260" y2="242" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+
+        <!-- ═══ TRAVELLING ARROWHEADS (animateMotion) ═══ -->
+        <polygon id="pfarr-solar" points="-5,-4 6,0 -5,4" fill="#22C55E" opacity="0.9">
+          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#pfpath-solar"/>
+          </animateMotion>
+        </polygon>
+        <polygon id="pfarr-grid" points="-5,-4 6,0 -5,4" fill="#F5276C" opacity="0.9">
+          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#pfpath-grid"/>
+          </animateMotion>
+        </polygon>
+        <polygon id="pfarr-bat" points="-5,-4 6,0 -5,4" fill="#8B5CF6" opacity="0.9">
+          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#pfpath-bat"/>
+          </animateMotion>
+        </polygon>
+        <polygon id="pfarr-load" points="-5,-4 6,0 -5,4" fill="#EAB308" opacity="0.9">
+          <animateMotion dur="1.2s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#pfpath-load"/>
+          </animateMotion>
+        </polygon>
+
+        <!-- ═══ NAMED PATHS for animateMotion ═══ -->
+        <path id="pfpath-solar" d="M80,76 L153,148"  fill="none" stroke="none"/>
+        <path id="pfpath-grid"  d="M260,76 L187,148" fill="none" stroke="none"/>
+        <path id="pfpath-bat"   d="M153,175 L75,242"  fill="none" stroke="none"/>
+        <path id="pfpath-load"  d="M187,175 L260,242" fill="none" stroke="none"/>
 
         <!-- ═══ SOLAR NODE ═══ -->
         <circle cx="80" cy="52" r="34" fill="#0A1628" stroke="#22C55E" stroke-width="2"/>
         <text x="80" y="44" text-anchor="middle" font-size="20">☀️</text>
-        <text x="80" y="58" text-anchor="middle" fill="#22C55E" font-size="9" font-weight="700" id="pf-val-solar">0.00 kW</text>
-        <text x="80" y="70" text-anchor="middle" fill="#475569" font-size="7.5">PV Solar</text>
+        <text x="80" y="58" text-anchor="middle" fill="#F1F5F9" font-size="9" font-weight="700" id="pf-val-solar">0.00 kW</text>
+        <text x="80" y="70" text-anchor="middle" fill="#94A3B8" font-size="7.5">PV Solar</text>
 
         <!-- ═══ GRID NODE ═══ -->
         <circle cx="260" cy="52" r="34" fill="#0A1628" stroke="#F5276C" stroke-width="2" id="pf-node-grid"/>
         <text x="260" y="44" text-anchor="middle" font-size="20">🔌</text>
-        <text x="260" y="58" text-anchor="middle" fill="#F5276C" font-size="9" font-weight="700" id="pf-val-grid">0.00 kW</text>
-        <text x="260" y="70" text-anchor="middle" fill="#475569" font-size="7.5" id="pf-label-grid">Grid</text>
+        <text x="260" y="58" text-anchor="middle" fill="#F1F5F9" font-size="9" font-weight="700" id="pf-val-grid">0.00 kW</text>
+        <text x="260" y="70" text-anchor="middle" fill="#94A3B8" font-size="7.5" id="pf-label-grid">Grid</text>
 
         <!-- ═══ INVERTER NODE — custom icon ═══ -->
         <g transform="translate(170,162)">
@@ -797,14 +825,14 @@
         <!-- SOC % centred text -->
         <text id="pf-val-soc" x="75" y="249" text-anchor="middle" fill="#F1F5F9" font-size="11" font-weight="700">0%</text>
         <!-- Label & kW below -->
-        <text id="pf-label-bat" x="75" y="276" text-anchor="middle" fill="#8B5CF6" font-size="8" font-weight="600">Battery</text>
-        <text id="pf-val-bat-kw" x="75" y="287" text-anchor="middle" fill="#475569" font-size="7.5">0.00 kW</text>
+        <text id="pf-label-bat" x="75" y="276" text-anchor="middle" fill="#F1F5F9" font-size="8" font-weight="600">Battery</text>
+        <text id="pf-val-bat-kw" x="75" y="287" text-anchor="middle" fill="#94A3B8" font-size="7.5">0.00 kW</text>
 
         <!-- ═══ LOAD NODE ═══ -->
         <circle cx="260" cy="262" r="34" fill="#0A1628" stroke="#EAB308" stroke-width="2"/>
         <text x="260" y="254" text-anchor="middle" font-size="20">🏠</text>
-        <text x="260" y="268" text-anchor="middle" fill="#EAB308" font-size="9" font-weight="700" id="pf-val-load">0.00 kW</text>
-        <text x="260" y="280" text-anchor="middle" fill="#475569" font-size="7.5">Home Load</text>
+        <text x="260" y="268" text-anchor="middle" fill="#F1F5F9" font-size="9" font-weight="700" id="pf-val-load">0.00 kW</text>
+        <text x="260" y="280" text-anchor="middle" fill="#94A3B8" font-size="7.5">Home Load</text>
 
       </svg>
     </div>
@@ -2745,8 +2773,28 @@ function updatePowerFlowDiagram() {
   document.getElementById('pf-val-soc').textContent     = soc + '%';
   document.getElementById('pf-label-bat').textContent   = batCharging ? 'Charging' : batDischarging ? 'Discharging' : 'Battery';
   document.getElementById('pf-val-bat-kw').textContent  = batKw.toFixed(2) + ' kW';
-  document.getElementById('pf-val-load').textContent    = load.toFixed(2) + ' kW';
-  document.getElementById('powerFlowTimestamp').textContent = 'Last reading: ' + time.slice(11, 16) + ' SAST';
+  // Update arrowhead paths for correct direction
+  function setArrowPath(pathId, x1, y1, x2, y2, reverse) {
+    const p = document.getElementById(pathId);
+    if (!p) return;
+    if (reverse) p.setAttribute('d', `M${x2},${y2} L${x1},${y1}`);
+    else         p.setAttribute('d', `M${x1},${y1} L${x2},${y2}`);
+  }
+  setArrowPath('pfpath-solar', 80, 76, 153, 148, false);
+  setArrowPath('pfpath-grid',  260, 76, 187, 148, gridExport);
+  setArrowPath('pfpath-bat',   153, 175, 75, 242, batDischarging);
+  setArrowPath('pfpath-load',  187, 175, 260, 242, false);
+
+  // Hide arrowheads on idle lines
+  document.getElementById('pfarr-solar').setAttribute('opacity', solar > 0.05 ? '0.9' : '0');
+  document.getElementById('pfarr-grid').setAttribute('opacity',  (gridImport||gridExport) ? '0.9' : '0');
+  document.getElementById('pfarr-bat').setAttribute('opacity',   batActive ? '0.9' : '0');
+  document.getElementById('pfarr-load').setAttribute('opacity',  load > 0.05 ? '0.9' : '0');
+
+  // Arrowhead fill colours
+  document.getElementById('pfarr-grid').setAttribute('fill', gridExport ? '#22C55E' : '#F5276C');
+  document.getElementById('pfarr-bat').setAttribute('fill',  batDischarging ? '#14B8A6' : '#8B5CF6');
+
 }
 
 function startPowerFlowAnimation() {
