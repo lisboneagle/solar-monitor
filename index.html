@@ -2684,14 +2684,16 @@ function updatePowerFlowDiagram() {
   const soc     = last.soc_pct    || 0;
   const time    = last.time       || '';
 
-  // Home load: use consumption_kw if > 0, else calculate from energy balance
+  // Home load: use consumption_kw if reasonable, else calculate from energy balance
+  // Energy balance: Load = PV + Grid_import - Battery_charging + Battery_discharging
+  const gridIn   = Math.max(0, grid);
+  const batDis   = Math.max(0, battery);   // discharging (positive)
+  const batCh    = Math.max(0, -battery);  // charging (negative→positive)
+  const calcLoad = Math.max(0, solar + gridIn + batDis - batCh);
   let load = last.consumption_kw || 0;
-  if (load < 0.05) {
-    // Fallback: solar + grid_import + battery_discharge - battery_charge
-    const gridIn  = Math.max(0, grid);
-    const batDis  = Math.max(0, battery);
-    const batCh   = Math.max(0, -battery);
-    load = Math.max(0, solar + gridIn + batDis - batCh);
+  // Use calculated value if consumption_kw is suspiciously low vs calculated
+  if (load < calcLoad * 0.5 && calcLoad > 0.1) {
+    load = calcLoad;
   }
 
   const gridImport    = grid > 0.05;
@@ -2734,9 +2736,12 @@ function updatePowerFlowDiagram() {
   const batFill = document.getElementById('pf-bat-fill');
   if (batFill) {
     batFill.setAttribute('width', Math.round((soc / 100) * 52));
+    // Fill colour reflects SOC level; border stays purple always
     const bc = soc >= 60 ? '#10B981' : soc >= 30 ? '#F59E0B' : '#EF4444';
     batFill.setAttribute('fill', bc);
-    document.getElementById('pf-bat-border').setAttribute('stroke', bc);
+    // Border colour: purple=charging, teal=discharging, grey=idle — matches line colour
+    const borderCol = batCharging ? '#8B5CF6' : batDischarging ? '#14B8A6' : '#475569';
+    document.getElementById('pf-bat-border').setAttribute('stroke', borderCol);
   }
   document.getElementById('pf-val-soc').textContent    = soc + '%';
   document.getElementById('pf-label-bat').textContent  = batCharging ? 'Charging' : batDischarging ? 'Discharging' : 'Battery';
