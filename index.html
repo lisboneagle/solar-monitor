@@ -747,13 +747,13 @@
           <marker id="mBatDis" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#14B8A6"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <marker id="mLoad"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#EAB308"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <marker id="mIdle"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#334155"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
-          <clipPath id="batClip"><rect x="47" y="259" width="56" height="34" rx="3"/></clipPath>
+          <clipPath id="batClip"><rect x="47" y="245" width="56" height="34" rx="3"/></clipPath>
         </defs>
 
         <!-- ═══ LINES (behind nodes) ═══ -->
         <line id="pfl-solar" x1="80"  y1="76"  x2="153" y2="148" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
         <line id="pfl-grid"  x1="260" y1="76"  x2="187" y2="148" stroke="#F5276C" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
-        <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="273" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+        <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="262" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
         <line id="pfl-load"  x1="187" y1="175" x2="260" y2="242" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
 
         <!-- ═══ JS-DRIVEN ANIMATED DOTS ═══ -->
@@ -793,18 +793,18 @@
 
         <!-- ═══ BATTERY NODE — dynamic fill ═══ -->
         <!-- Outer casing -->
-        <rect x="45" y="256" width="60" height="40" rx="7" fill="#0A1628" stroke="#8B5CF6" stroke-width="2" id="pf-bat-border"/>
+        <rect x="45" y="242" width="60" height="40" rx="7" fill="#0A1628" stroke="#8B5CF6" stroke-width="2" id="pf-bat-border"/>
         <!-- Positive nub -->
-        <rect id="pf-bat-terminal" x="105" y="269" width="7" height="14" rx="2" fill="#8B5CF6" opacity="0.7"/>
+        <rect id="pf-bat-terminal" x="105" y="255" width="7" height="14" rx="2" fill="#8B5CF6" opacity="0.7"/>
         <!-- Empty bg -->
-        <rect x="49" y="260" width="52" height="32" rx="4" fill="#1E293B"/>
+        <rect x="49" y="246" width="52" height="32" rx="4" fill="#1E293B"/>
         <!-- Dynamic fill bar (width set by JS based on SOC) -->
-        <rect id="pf-bat-fill" x="49" y="260" width="0" height="32" rx="4" fill="#8B5CF6" opacity="0.75"/>
+        <rect id="pf-bat-fill" x="49" y="246" width="0" height="32" rx="4" fill="#8B5CF6" opacity="0.75"/>
         <!-- SOC % centred text -->
-        <text id="pf-val-soc" x="75" y="280" text-anchor="middle" fill="#F1F5F9" font-size="11" font-weight="700">0%</text>
+        <text id="pf-val-soc" x="75" y="266" text-anchor="middle" fill="#F1F5F9" font-size="11" font-weight="700">0%</text>
         <!-- Label & kW below -->
-        <text id="pf-label-bat" x="75" y="307" text-anchor="middle" fill="#F1F5F9" font-size="8" font-weight="600">Battery</text>
-        <text id="pf-val-bat-kw" x="75" y="318" text-anchor="middle" fill="#94A3B8" font-size="7.5">0.00 kW</text>
+        <text id="pf-label-bat" x="75" y="293" text-anchor="middle" fill="#F1F5F9" font-size="8" font-weight="600">Battery</text>
+        <text id="pf-val-bat-kw" x="75" y="304" text-anchor="middle" fill="#94A3B8" font-size="7.5">0.00 kW</text>
 
         <!-- ═══ LOAD NODE ═══ -->
         <circle cx="260" cy="262" r="34" fill="#0A1628" stroke="#EAB308" stroke-width="2"/>
@@ -2784,7 +2784,7 @@ function updatePowerFlowDiagram() {
 const PF_DOTS = [
   { id: 'pfd-solar', x1:80,  y1:76,  x2:153, y2:148, stateKey: 'solar',   colour: '#22C55E', reverse: () => false },
   { id: 'pfd-grid',  x1:260, y1:76,  x2:187, y2:148, stateKey: 'grid',    colour: '#F5276C', reverse: () => window._pfState?.gridExport,  altColour: () => window._pfState?.gridExport ? '#22C55E' : '#F5276C' },
-  { id: 'pfd-bat',   x1:153, y1:175, x2:75,  y2:273, stateKey: 'battery', colour: '#8B5CF6', reverse: () => window._pfState?.batDischarging, altColour: () => window._pfState?.batDischarging ? '#14B8A6' : '#8B5CF6' },
+  { id: 'pfd-bat',   x1:153, y1:175, x2:75,  y2:262, stateKey: 'battery', colour: '#8B5CF6', reverse: () => window._pfState?.batDischarging, altColour: () => window._pfState?.batDischarging ? '#14B8A6' : '#8B5CF6' },
   { id: 'pfd-load',  x1:187, y1:175, x2:260, y2:242, stateKey: 'load',    colour: '#EAB308', reverse: () => false },
 ];
 const dotPos = { 'pfd-solar': 0, 'pfd-grid': 0.33, 'pfd-bat': 0.66, 'pfd-load': 0.1 };
