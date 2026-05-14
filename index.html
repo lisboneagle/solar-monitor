@@ -646,11 +646,11 @@
       <div class="gauge-needle" id="gaugeNeedle" style="left:80%"></div>
     </div>
     <div class="gauge-ticks">
-      <span>Critical</span>
-      <span>Poor</span>
-      <span>Fair</span>
-      <span>Good</span>
-      <span>Optimal</span>
+      <span style="color:#ECEDEF">Critical</span>
+      <span style="color:#ECEDEF">Poor</span>
+      <span style="color:#ECEDEF">Fair</span>
+      <span style="color:#ECEDEF">Good</span>
+      <span style="color:#ECEDEF">Optimal</span>
     </div>
   </div>
 </div>
@@ -725,7 +725,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="togglePowerFlow()">
     <div class="insights-title" style="margin-bottom:0">⚡ Live Power Flow</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:0.7rem;color:#475569" id="powerFlowHint">tap to expand</span>
+      <span style="font-size:0.7rem;color:#475569" id="powerFlowHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
       <div id="powerFlowArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
     </div>
   </div>
@@ -747,13 +747,13 @@
           <marker id="mBatDis" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#14B8A6"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <marker id="mLoad"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#EAB308"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <marker id="mIdle"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#334155"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
-          <clipPath id="batClip"><rect x="47" y="228" width="56" height="34" rx="3"/></clipPath>
+          <clipPath id="batClip"><rect x="47" y="259" width="56" height="34" rx="3"/></clipPath>
         </defs>
 
         <!-- ═══ LINES (behind nodes) ═══ -->
         <line id="pfl-solar" x1="80"  y1="76"  x2="153" y2="148" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
         <line id="pfl-grid"  x1="260" y1="76"  x2="187" y2="148" stroke="#F5276C" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
-        <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="242" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
+        <line id="pfl-bat"   x1="153" y1="175" x2="75"  y2="273" stroke="#8B5CF6" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
         <line id="pfl-load"  x1="187" y1="175" x2="260" y2="242" stroke="#EAB308" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
 
         <!-- ═══ JS-DRIVEN ANIMATED DOTS ═══ -->
@@ -793,18 +793,18 @@
 
         <!-- ═══ BATTERY NODE — dynamic fill ═══ -->
         <!-- Outer casing -->
-        <rect x="45" y="225" width="60" height="40" rx="7" fill="#0A1628" stroke="#8B5CF6" stroke-width="2" id="pf-bat-border"/>
+        <rect x="45" y="256" width="60" height="40" rx="7" fill="#0A1628" stroke="#8B5CF6" stroke-width="2" id="pf-bat-border"/>
         <!-- Positive nub -->
-        <rect id="pf-bat-terminal" x="105" y="238" width="7" height="14" rx="2" fill="#8B5CF6" opacity="0.7"/>
+        <rect id="pf-bat-terminal" x="105" y="269" width="7" height="14" rx="2" fill="#8B5CF6" opacity="0.7"/>
         <!-- Empty bg -->
-        <rect x="49" y="229" width="52" height="32" rx="4" fill="#1E293B"/>
+        <rect x="49" y="260" width="52" height="32" rx="4" fill="#1E293B"/>
         <!-- Dynamic fill bar (width set by JS based on SOC) -->
-        <rect id="pf-bat-fill" x="49" y="229" width="0" height="32" rx="4" fill="#8B5CF6" opacity="0.75"/>
+        <rect id="pf-bat-fill" x="49" y="260" width="0" height="32" rx="4" fill="#8B5CF6" opacity="0.75"/>
         <!-- SOC % centred text -->
-        <text id="pf-val-soc" x="75" y="249" text-anchor="middle" fill="#F1F5F9" font-size="11" font-weight="700">0%</text>
+        <text id="pf-val-soc" x="75" y="280" text-anchor="middle" fill="#F1F5F9" font-size="11" font-weight="700">0%</text>
         <!-- Label & kW below -->
-        <text id="pf-label-bat" x="75" y="276" text-anchor="middle" fill="#F1F5F9" font-size="8" font-weight="600">Battery</text>
-        <text id="pf-val-bat-kw" x="75" y="287" text-anchor="middle" fill="#94A3B8" font-size="7.5">0.00 kW</text>
+        <text id="pf-label-bat" x="75" y="307" text-anchor="middle" fill="#F1F5F9" font-size="8" font-weight="600">Battery</text>
+        <text id="pf-val-bat-kw" x="75" y="318" text-anchor="middle" fill="#94A3B8" font-size="7.5">0.00 kW</text>
 
         <!-- ═══ LOAD NODE ═══ -->
         <circle cx="260" cy="262" r="34" fill="#0A1628" stroke="#EAB308" stroke-width="2"/>
@@ -814,7 +814,7 @@
 
       </svg>
     </div>
-    <div style="text-align:center;font-size:0.65rem;color:#475569;margin-top:4px;" id="powerFlowTimestamp">—</div>
+    <div style="text-align:center;font-size:0.65rem;color:#ECEDEF;margin-top:4px;" id="powerFlowTimestamp">—</div>
   </div>
 </div>
 
@@ -916,7 +916,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleInsights()">
       <div class="insights-title" style="margin-bottom:0">📊 Key Insights</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="insightsHint">tap to expand</span>
+        <span style="font-size:0.7rem;color:#475569" id="insightsHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
         <div id="insightsArrow" style="
           width:28px;height:28px;
           border-radius:50%;
@@ -947,7 +947,7 @@
         <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="loadShiftHint">tap to expand</span>
+        <span style="font-size:0.7rem;color:#475569" id="loadShiftHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
         <div id="loadShiftArrow" style="
           width:28px;height:28px;
           border-radius:50%;
@@ -999,7 +999,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleDataInput()">
       <div class="insights-title" style="margin-bottom:0">📂 System Data Input</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="dataInputHint">tap to expand</span>
+        <span style="font-size:0.7rem;color:#475569" id="dataInputHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
         <div id="dataInputArrow" style="
           width:28px;height:28px;border-radius:50%;
           background:rgba(255,255,255,0.06);
@@ -1238,7 +1238,7 @@ function loadDataFromMap(map) {
   })() : 'Uploaded Data';
 
   document.getElementById('headerSubtitle').innerHTML =
-    `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong>`;
+    `${headerSubtitleHTML(prettyDate, DATA)}`;
 
   // Reset controls and rebuild everything
   startIdx = 0;
@@ -1271,6 +1271,15 @@ let smoothing = false;
 let chartType = 'line';
 let seriesVisible = { Production: true, Consumption: true, Grid: true, Battery: true, PV: true };
 let mainChart, socChart, donutChart, barChart;
+
+function headerSubtitleHTML(prettyDate, rows) {
+  const lastRow = rows && rows.length ? rows[rows.length - 1] : null;
+  const lastTime = lastRow ? lastRow.time.slice(11, 16) : null;
+  const readingLine = lastTime
+    ? `<br><span style="color:#ECEDEF;font-size:0.78rem;font-weight:500;letter-spacing:0.01em;">Last reading: ${lastTime} SAST</span>`
+    : '';
+  return `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong>${readingLine}`;
+}
 
 // ============================================================
 // HELPERS
@@ -1476,7 +1485,7 @@ async function loadPeriodData() {
           const d = new Date(dayKey + 'T12:00:00');
           const prettyDate = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
           document.getElementById('headerSubtitle').innerHTML =
-            `<strong style="color:#CBD5E1;font-size:1.05rem">${prettyDate}</strong>`;
+            `${headerSubtitleHTML(prettyDate, DATA)}`;
         } else if (todayData) {
           DATA.length = 0;
           todayData.forEach(r => DATA.push(r));
@@ -1485,7 +1494,7 @@ async function loadPeriodData() {
           if (todayStr) {
             const d = new Date(todayStr + 'T12:00:00');
             document.getElementById('headerSubtitle').innerHTML =
-              `<strong style="color:#CBD5E1;font-size:1.05rem">${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>`;
+              `${headerSubtitleHTML(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }), DATA)}`;
           }
         }
       }
@@ -2678,14 +2687,14 @@ function togglePowerFlow() {
     body.style.maxHeight = '520px';
     body.style.opacity   = '1';
     arrow.innerHTML      = '⬆️';
-    hint.textContent     = 'tap to collapse';
+    hint.textContent = 'tap to collapse'; hint.style.color = '#ECEDEF';
     updatePowerFlowDiagram();
     startPowerFlowAnimation();
   } else {
     body.style.maxHeight = '0';
     body.style.opacity   = '0';
     arrow.innerHTML      = 'ℹ️';
-    hint.textContent     = 'tap to expand';
+    hint.textContent = 'tap to expand'; hint.style.color = '#ECEDEF';
     if (powerFlowAnimFrame) cancelAnimationFrame(powerFlowAnimFrame);
   }
 }
@@ -2775,7 +2784,7 @@ function updatePowerFlowDiagram() {
 const PF_DOTS = [
   { id: 'pfd-solar', x1:80,  y1:76,  x2:153, y2:148, stateKey: 'solar',   colour: '#22C55E', reverse: () => false },
   { id: 'pfd-grid',  x1:260, y1:76,  x2:187, y2:148, stateKey: 'grid',    colour: '#F5276C', reverse: () => window._pfState?.gridExport,  altColour: () => window._pfState?.gridExport ? '#22C55E' : '#F5276C' },
-  { id: 'pfd-bat',   x1:153, y1:175, x2:75,  y2:242, stateKey: 'battery', colour: '#8B5CF6', reverse: () => window._pfState?.batDischarging, altColour: () => window._pfState?.batDischarging ? '#14B8A6' : '#8B5CF6' },
+  { id: 'pfd-bat',   x1:153, y1:175, x2:75,  y2:273, stateKey: 'battery', colour: '#8B5CF6', reverse: () => window._pfState?.batDischarging, altColour: () => window._pfState?.batDischarging ? '#14B8A6' : '#8B5CF6' },
   { id: 'pfd-load',  x1:187, y1:175, x2:260, y2:242, stateKey: 'load',    colour: '#EAB308', reverse: () => false },
 ];
 const dotPos = { 'pfd-solar': 0, 'pfd-grid': 0.33, 'pfd-bat': 0.66, 'pfd-load': 0.1 };
@@ -2822,12 +2831,12 @@ function toggleLoadShift() {
     body.style.maxHeight = body.scrollHeight + 500 + 'px';
     body.style.opacity   = '1';
     arrow.innerHTML      = '⬆️';
-    hint.textContent     = 'tap to collapse';
+    hint.textContent = 'tap to collapse'; hint.style.color = '#ECEDEF';
   } else {
     body.style.maxHeight = '0';
     body.style.opacity   = '0';
     arrow.innerHTML      = 'ℹ️';
-    hint.textContent     = 'tap to expand';
+    hint.textContent = 'tap to expand'; hint.style.color = '#ECEDEF';
   }
 }
 
@@ -2840,12 +2849,12 @@ function toggleInsights() {
     body.style.maxHeight = body.scrollHeight + 300 + 'px';
     body.style.opacity   = '1';
     arrow.innerHTML      = '⬆️';
-    hint.textContent     = 'tap to collapse';
+    hint.textContent = 'tap to collapse'; hint.style.color = '#ECEDEF';
   } else {
     body.style.maxHeight = '0';
     body.style.opacity   = '0';
     arrow.innerHTML      = 'ℹ️';
-    hint.textContent     = 'tap to expand';
+    hint.textContent = 'tap to expand'; hint.style.color = '#ECEDEF';
   }
 }
 
@@ -2859,12 +2868,12 @@ function toggleDataInput() {
     body.style.maxHeight = body.scrollHeight + 200 + 'px';
     body.style.opacity   = '1';
     arrow.innerHTML      = '⬆️';
-    hint.textContent     = 'tap to collapse';
+    hint.textContent = 'tap to collapse'; hint.style.color = '#ECEDEF';
   } else {
     body.style.maxHeight = '0';
     body.style.opacity   = '0';
     arrow.innerHTML      = 'ℹ️';
-    hint.textContent     = 'tap to expand';
+    hint.textContent = 'tap to expand'; hint.style.color = '#ECEDEF';
   }
 }
 
