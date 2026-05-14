@@ -39,20 +39,34 @@ def is_success(data):
     code = str(data.get("code", ""))
     return data.get("success", False) or code in ("0", "200", "1000000")
 
-def post(path, payload, token=None, query_params=None):
+def post(path, payload, token=None, query_params=None, retries=3, retry_delay=15):
+    import time
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"bearer {token}"
     url = f"{BASE_URL}/{path}"
     if query_params:
         url += "?" + "&".join(f"{k}={v}" for k, v in query_params.items())
-    resp = requests.post(url, headers=headers, json=payload, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
-    print(f"    → /{path} code: {data.get('code')} success: {data.get('success')}")
-    if not is_success(data):
-        raise RuntimeError(f"API error on /{path}: {data}")
-    return data
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=30)
+            if resp.status_code >= 500:
+                raise requests.HTTPError(f"Server error {resp.status_code}", response=resp)
+            resp.raise_for_status()
+            data = resp.json()
+            print(f"    → /{path} code: {data.get('code')} success: {data.get('success')}")
+            if not is_success(data):
+                raise RuntimeError(f"API error on /{path}: {data}")
+            return data
+        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as e:
+            last_err = e
+            if attempt < retries:
+                print(f"    ⚠ Attempt {attempt}/{retries} failed ({e}) — retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                print(f"    ✗ All {retries} attempts failed for /{path}")
+    raise last_err
 
 # ── Step 1: Authenticate ──────────────────────────────────────────────────────
 # Per official sample code:
