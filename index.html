@@ -3213,6 +3213,47 @@ async function init() {
 init();
 
 // ============================================================
+// AUTO-REFRESH: re-fetch latest.json every 10 minutes so the
+// dashboard stays current without a manual page reload.
+// Only refreshes when new data is actually available.
+// ============================================================
+setInterval(async () => {
+  try {
+    const resp = await fetch(`data/latest.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!resp.ok) return;
+    const json = await resp.json();
+    const rows = json.rows || json;
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    // Only auto-update if this is today's live data
+    const latestDate = rows[rows.length - 1]?.time?.slice(0, 10);
+    if (latestDate !== dateToKeySAST()) return;
+
+    // Skip if data hasn't changed
+    const currentLast = DATA[DATA.length - 1]?.time;
+    const newLast = rows[rows.length - 1]?.time;
+    if (newLast <= currentLast) return;
+
+    // Silently reload
+    rawUploadedRows = rows;
+    const identityMap = {
+      time: 'time', production_kw: 'production_kw', consumption_kw: 'consumption_kw',
+      grid_kw: 'grid_kw', battery_kw: 'battery_kw', soc_pct: 'soc_pct', pv_kw: 'pv_kw',
+    };
+    loadDataFromMap(identityMap);
+    todayData = [...DATA];
+    loadPeriodData();
+    loadWeather().then(() => renderLoadShifting());
+
+    const loadTime = nowSAST().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+    document.getElementById('dataInputHint').textContent = `Last updated: ${json.date} | ${loadTime}`;
+    console.log(`[auto-refresh] Data updated to ${newLast}`);
+  } catch (e) {
+    console.warn('[auto-refresh] Failed:', e);
+  }
+}, 10 * 60 * 1000); // every 10 minutes, matching the GitHub Actions fetch interval
+
+// ============================================================
 // SERVICE WORKER REGISTRATION (required for PWA installability)
 // ============================================================
 if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
