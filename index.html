@@ -731,7 +731,7 @@
   </div>
   <div id="powerFlowBody" style="max-height:0;overflow:hidden;transition:max-height 0.4s ease,opacity 0.3s ease;opacity:0;">
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:center;">
-      <svg id="powerFlowSVG" viewBox="0 0 340 310" width="100%" style="max-width:440px;overflow:visible;display:block;">
+      <svg id="powerFlowSVG" viewBox="0 0 340 320" width="100%" style="max-width:440px;overflow:visible;display:block;">
         <defs>
           <style>
             .pf-dash     { stroke-dasharray:10 6; animation:pf-fwd 1.0s linear infinite; }
@@ -749,6 +749,22 @@
           <marker id="mIdle"   markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6" fill="none" stroke="#334155"  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
           <clipPath id="batClip"><rect x="47" y="245" width="56" height="34" rx="3"/></clipPath>
         </defs>
+
+
+        <!-- ═══ HOUSE OUTLINE ═══ -->
+        <!-- Roof: peak at (170,6), eaves at (10,112) and (330,112) -->
+        <!-- Walls: rect from (10,112) to (330,308) -->
+        <g id="pf-house" opacity="0.18" pointer-events="none">
+          <!-- Wall body -->
+          <rect x="10" y="112" width="320" height="196" rx="3"
+                fill="none" stroke="#94A3B8" stroke-width="2"/>
+          <!-- Roof triangle -->
+          <polyline points="10,112 170,8 330,112"
+                fill="none" stroke="#94A3B8" stroke-width="2" stroke-linejoin="round"/>
+          <!-- Chimney (decorative, top-right of roof) -->
+          <rect x="248" y="38" width="16" height="30" rx="2"
+                fill="none" stroke="#94A3B8" stroke-width="1.5"/>
+        </g>
 
         <!-- ═══ LINES (behind nodes) ═══ -->
         <line id="pfl-solar" x1="80"  y1="76"  x2="153" y2="148" stroke="#22C55E" stroke-width="2.5" stroke-linecap="round" class="pf-dash"/>
