@@ -42,6 +42,7 @@ jobs:
           WHATSAPP_APIKEY:  ${{ secrets.WHATSAPP_APIKEY }}
           WHATSAPP_PHONE2:  ${{ secrets.WHATSAPP_PHONE2 }}
           WHATSAPP_APIKEY2: ${{ secrets.WHATSAPP_APIKEY2 }}
+          TEST_MODE:        ${{ github.event.inputs.test_mode || 'false' }}
         run: |
           python3 - <<'PYEOF'
           import json, os, urllib.request, urllib.parse, datetime
@@ -118,7 +119,9 @@ jobs:
           pv_values   = [r.get("pv_kw", 0)   for r in recent]
 
           # Grid is "active" if any reading shows non-zero grid power
-          grid_active = any(abs(g) > 0.05 for g in grid_values)
+          # Grid considered active if MAJORITY of recent readings show > 0.15 kW
+          # This filters out 0.01-0.05 kW noise and avoids masking real failures
+          grid_active = sum(1 for g in grid_values if abs(g) > 0.15) >= 2
 
           # System has meaningful load (not idle/sleeping)
           has_load    = load > 0.1
