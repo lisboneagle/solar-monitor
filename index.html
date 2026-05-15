@@ -3388,6 +3388,18 @@ function renderNilm() {
       timeOk: h => h >= 19.0,
       minDur: 3,
     },
+    {
+      key: 'dishwasher',
+      label: 'Dishwasher',
+      icon: '🍽️',
+      colour: '#10B981',
+      // 2.4kW element; allow for rinse-phase dip so band is wide
+      // Overlap with cooking (12:00-13:00) handled by requiring longer duration
+      minExcess: 1.6, maxExcess: 2.8,
+      // Runs morning or post-lunch; exclude pure cooking window unless long duration
+      timeOk: h => (h >= 9.0 && h < 14.5),
+      minDur: 6,  // ≥30 min — dishwasher runs at least this long; filters out cooking
+    },
     // ── Catch-all for unidentified sustained loads ────────────────────────────
     {
       key: 'elevated',
@@ -3448,6 +3460,7 @@ function renderNilm() {
     pool:           { label: 'Pool Pump',       icon: '🌀', colour: '#3B82F6', kwh: 0 },
     washing:        { label: 'Washing',         icon: '🧺', colour: '#8B5CF6', kwh: 0 },
     aircon:         { label: 'Air Con',         icon: '❄️', colour: '#06B6D4', kwh: 0 },
+    dishwasher:     { label: 'Dishwasher',      icon: '🍽️', colour: '#10B981', kwh: 0 },
     elevated:       { label: 'Other',           icon: '⚡', colour: '#A78BFA', kwh: 0 },
     baseline:       { label: 'Always-on',       icon: '🔌', colour: '#475569', kwh: 0 },
   };
