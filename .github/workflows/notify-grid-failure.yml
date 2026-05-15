@@ -45,7 +45,7 @@ jobs:
           TEST_MODE:        ${{ github.event.inputs.test_mode || 'false' }}
         run: |
           python3 - <<'PYEOF'
-          import json, os, urllib.request, urllib.parse, datetime
+          import json, os, time, urllib.request, urllib.parse, datetime
 
           PHONE    = os.environ["WHATSAPP_PHONE"]
           APIKEY   = os.environ["WHATSAPP_APIKEY"]
@@ -118,44 +118,64 @@ jobs:
           grid_values = [r.get("grid_kw", 0) for r in recent]
           pv_values   = [r.get("pv_kw", 0)   for r in recent]
 
-          # Grid is "active" if any reading shows non-zero grid power
           # Grid considered active if MAJORITY of recent readings show > 0.15 kW
-          # This filters out 0.01-0.05 kW noise and avoids masking real failures
           grid_active = sum(1 for g in grid_values if abs(g) > 0.15) >= 2
 
-          # System has meaningful load (not idle/sleeping)
-          has_load    = load > 0.1
-
-          # If there's no load at all, we can't reliably detect grid state
-          if not has_load:
-              print(f"System load is {load:.2f} kW — too low to detect grid state reliably")
-              exit(0)
-
-          # Determine current state
-          # Grid is offline if: no grid power AND no PV (night) is NOT the case
-          # i.e. it's daytime (PV > 0) OR load > 0.5 kW but still no grid draw
-          # More robust: if grid was previously online and now shows 0 across
-          # multiple readings while load exists, flag as offline
-          grid_is_online = grid_active
-
-          # Also treat as online if PV alone is covering load (can't distinguish
-          # intentional off-grid from failure) — only flag if battery is
-          # discharging AND no PV AND no grid (clear grid failure scenario)
           battery_kw  = last.get("battery_kw", 0)
           pv_now      = last.get("pv_kw", 0)
           all_pv_zero = all(p < 0.1 for p in pv_values)
 
-          # Clear grid failure: no grid, no PV, battery discharging to cover load
-          clear_failure = (not grid_active) and all_pv_zero and battery_kw > 0.2
+          # ── Time-of-day guard ─────────────────────────────────────────────
+          # Extract SAST hour from timestamp (timestamps are already SAST)
+          try:
+              from datetime import datetime
+              ts   = last.get("time", "")
+              hour = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").hour +                      datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").minute / 60
+          except Exception:
+              hour = 12  # fallback to midday if parse fails
 
-          # Possible failure: no grid, has PV (could be solar covering load, or
-          # could be genuine failure + solar) — only alert if flag was online
-          possible_failure = (not grid_active) and (not all_pv_zero)
+          is_night = hour >= 19.0 or hour < 7.0
+
+          # ── SOC trajectory (is battery draining unusually fast?) ──────────
+          # Use last 6 readings (~30 min) to compute SOC drop rate
+          soc_values  = [r.get("soc_pct", soc) for r in rows[-6:]]
+          soc_drop    = soc_values[0] - soc_values[-1]   # positive = draining
+          # Normal overnight drain: ~0.5-1% per 5 min at typical load
+          # Abnormal: >3% drop per 30 min suggests unexpected heavy load
+          rapid_drain = soc_drop > 3.0
+
+          # System has meaningful load
+          has_load = load > 0.1
+
+          if not has_load:
+              print(f"System load is {load:.2f} kW — too low to detect grid state reliably")
+              exit(0)
+
+          grid_is_online = grid_active
+
+          # ── Failure classification ────────────────────────────────────────
+          # NIGHT RULES: battery-only at night is NORMAL — only alert if:
+          #   - SOC is draining rapidly (unexpected heavy load), OR
+          #   - Load is unusually high for nighttime (>2 kW, e.g. aircon + geyser)
+          # DAY RULES: no grid + no PV + battery discharging = clear failure
+          #            no grid + PV active = possible failure (2-run confirm)
+
+          if is_night:
+              # At night, only flag as failure if drain is abnormally rapid
+              # Normal: battery covers modest load (0.3-1.5 kW) — not a failure
+              clear_failure    = (not grid_active) and all_pv_zero and rapid_drain and load > 1.5
+              possible_failure = (not grid_active) and all_pv_zero and rapid_drain and load > 1.0
+          else:
+              # Daytime: clear failure = no grid, no PV, battery discharging
+              clear_failure    = (not grid_active) and all_pv_zero and battery_kw > 0.2
+              # Possible failure: no grid but PV active — wait for 2nd confirmation
+              possible_failure = (not grid_active) and (not all_pv_zero)
 
           print(f"Grid active:      {grid_active} (values: {[round(g,3) for g in grid_values]})")
           print(f"PV now:           {pv_now:.2f} kW | All PV zero: {all_pv_zero}")
-          print(f"Battery:          {battery_kw:.2f} kW | SOC: {soc}%")
-          print(f"Load:             {load:.2f} kW")
+          print(f"Battery:          {battery_kw:.2f} kW | SOC: {soc}% | SOC drop (30min): {soc_drop:.1f}%")
+          print(f"Load:             {load:.2f} kW | Hour: {hour:.1f} | Night: {is_night}")
+          print(f"Rapid drain:      {rapid_drain}")
           print(f"Clear failure:    {clear_failure}")
           print(f"Possible failure: {possible_failure}")
 
@@ -174,13 +194,17 @@ jobs:
           # ── State machine ─────────────────────────────────────────────────
           if clear_failure and prev_status == "online":
               # Grid just failed
+              runtime_hrs = (soc / 100 * 16.07 / load) if load > 0 else 0
+              night_note  = "⚠️ Night failure — battery is draining faster than normal.\n" if is_night else ""
               msg = (
                   f"🔌❌ *Grid Failure Detected!*\n"
+                  f"{night_note}"
                   f"The grid has gone down. Your solar system has switched to battery/UPS mode.\n\n"
                   f"🔋 Battery SOC: *{soc}%*\n"
                   f"🏠 Current load: *{load:.2f} kW*\n"
-                  f"⏱ Estimated runtime: *{(soc/100 * 16.07 / load):.1f} hrs* at current usage\n\n"
+                  f"⏱ Estimated runtime: *{runtime_hrs:.1f} hrs* at current usage\n\n"
                   f"💡 Consider switching off non-essential appliances to extend battery life.\n"
+                  f"🔔 You will receive another message when the grid is restored.\n"
                   f"🕐 {time_str}"
               )
               print("⚠ Grid failure detected — sending notification")
@@ -210,10 +234,23 @@ jobs:
               write_flag("offline")
 
           elif grid_is_online and prev_status in ("offline", "pending"):
-              # Grid has been restored
+              # Grid has been restored — calculate outage duration from flag timestamp
+              try:
+                  flag_mtime  = os.path.getmtime(FLAG)
+                  outage_mins = int((time.time() - flag_mtime) / 60)
+                  if outage_mins < 60:
+                      duration_str = f"{outage_mins} minutes"
+                  else:
+                      hrs  = outage_mins // 60
+                      mins = outage_mins % 60
+                      duration_str = f"{hrs}h {mins}m"
+              except Exception:
+                  duration_str = "unknown duration"
+              soc_delta = ""
               msg = (
                   f"🔌✅ *Grid Restored!*\n"
                   f"Mains power is back. Your system has reconnected to the grid.\n\n"
+                  f"⏱ Outage duration: *{duration_str}*\n"
                   f"🔋 Battery SOC: *{soc}%*\n"
                   f"🕐 {time_str}"
               )
