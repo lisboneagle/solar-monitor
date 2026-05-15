@@ -3306,49 +3306,133 @@ function renderNilm() {
   }
 
   const BAT_CAPACITY = 16.07; // kWh
+  const INTERVAL_H   = 5 / 60;
 
-  // ── Detect load events ──────────────────────────────────────────────────────
-  // Classify each 5-min reading into a load tier
-  const INTERVAL_H = 5 / 60;
+  // ── Build overnight baseline (00:00–05:00 median) ───────────────────────────
+  const nightRows = fd.filter(r => { const h = parseInt(r.time.slice(11,13)); return h < 5; });
+  const nightCons = nightRows.map(r => r.consumption_kw).sort((a,b) => a-b);
+  const baseline  = nightCons.length ? nightCons[Math.floor(nightCons.length / 2)] : 0.40;
 
-  // Build overnight baseline (00:00–05:00): median consumption
-  const nightRows  = fd.filter(r => { const h = parseInt(r.time.slice(11,13)); return h >= 0 && h < 5; });
-  const nightCons  = nightRows.map(r => r.consumption_kw).sort((a,b) => a-b);
-  const baseline   = nightCons.length ? nightCons[Math.floor(nightCons.length / 2)] : 0.35;
+  // ── Appliance signatures calibrated from Sonoff ground-truth data ───────────
+  // Pool pump:      actual ~970W (nameplate 800W); runs 09:00-10:00, 14:00-17:00
+  // Main geyser:    3kW element, ~47% duty cycle in window → avg 1.4kW across window
+  //                 timer: 10:00-12:00 and 15:30-16:30
+  // Laundry geyser: 3kW element, ~60% duty cycle → avg 1.8kW; 14:00-15:00
+  //                 only heats ~57% of days (skips when water already hot)
+  // Cooking:        electric stove/oven, typically 12:00-13:00
+  // Washing machine: ~1.5-2kW, Mon/Thu/Sun 10:00-12:00
+  // Aircon:         variable 0.8-2.5kW per unit, typically post 19:00 winter
+  //
+  // Each signature is checked IN ORDER — first match wins (most specific first)
+  const APPLIANCES = [
+    // ── Time-windowed signatures (checked first — highest confidence) ──────────
+    {
+      key: 'pool',
+      label: 'Pool Pump',
+      icon: '🌀',
+      colour: '#3B82F6',
+      // Excess above baseline must be in pool pump band
+      minExcess: 0.75, maxExcess: 1.25,
+      // Time windows: 09:00-10:15 OR 13:45-17:15 (allow 15min drift)
+      timeOk: h => (h >= 9.0 && h < 10.25) || (h >= 13.75 && h < 17.25),
+      minDur: 2, // ≥10 min
+    },
+    {
+      key: 'geyser_main',
+      label: 'Main Geyser',
+      icon: '🌡️',
+      colour: '#F97316',
+      // Full 3kW draw (element actively on) OR partial duty cycle
+      minExcess: 1.2, maxExcess: 3.5,
+      // Time windows: 09:45-12:15 OR 15:15-16:45 (allow 15min drift)
+      timeOk: h => (h >= 9.75 && h < 12.25) || (h >= 15.25 && h < 16.75),
+      minDur: 2,
+    },
+    {
+      key: 'geyser_laundry',
+      label: 'Laundry Geyser',
+      icon: '🚿',
+      colour: '#FB923C',
+      minExcess: 1.2, maxExcess: 3.5,
+      // Time window: 13:45-15:15
+      timeOk: h => h >= 13.75 && h < 15.25,
+      minDur: 2,
+    },
+    {
+      key: 'cooking',
+      label: 'Cooking / Oven',
+      icon: '🍳',
+      colour: '#EF4444',
+      minExcess: 0.8, maxExcess: 4.5,
+      // Cooking window: 11:30-13:30
+      timeOk: h => h >= 11.5 && h < 13.5,
+      minDur: 2,
+    },
+    {
+      key: 'washing',
+      label: 'Washing Machine',
+      icon: '🧺',
+      colour: '#8B5CF6',
+      minExcess: 1.0, maxExcess: 2.5,
+      // 10:00-12:00 window (overlaps geyser but different wattage band)
+      timeOk: h => h >= 10.0 && h < 12.0,
+      minDur: 3, // ≥15 min (wash cycle)
+    },
+    {
+      key: 'aircon',
+      label: 'Air Conditioning',
+      icon: '❄️',
+      colour: '#06B6D4',
+      minExcess: 0.7, maxExcess: 3.5,
+      // Post 19:00 (winter evening use)
+      timeOk: h => h >= 19.0,
+      minDur: 3,
+    },
+    // ── Catch-all for unidentified sustained loads ────────────────────────────
+    {
+      key: 'elevated',
+      label: 'Unidentified Load',
+      icon: '⚡',
+      colour: '#A78BFA',
+      minExcess: 0.5, maxExcess: 99,
+      timeOk: () => true,
+      minDur: 3,
+    },
+  ];
 
-  // Signature thresholds (above baseline)
-  const THRESH = {
-    geyser:   { min: 1.6,  max: 4.0,  label: 'Geyser / Heating',  icon: '🌡️', colour: '#F97316' },
-    cooking:  { min: 0.9,  max: 4.0,  label: 'Cooking / Oven',     icon: '🍳', colour: '#EF4444' },
-    pool:     { min: 0.55, max: 1.8,  label: 'Pool / Sustained',   icon: '🌀', colour: '#3B82F6' },
-    elevated: { min: 0.3,  max: 0.55, label: 'Elevated Load',      icon: '⚡', colour: '#A78BFA' },
-  };
-
-  // Scan for contiguous high-load events (≥2 consecutive readings = ≥10 min)
+  // ── Scan for contiguous events ───────────────────────────────────────────────
   const events = [];
   let i = 0;
   while (i < fd.length) {
-    const excess = fd[i].consumption_kw - baseline;
+    const row    = fd[i];
+    const excess = row.consumption_kw - baseline;
+    const hour   = parseInt(row.time.slice(11,13)) + parseInt(row.time.slice(14,16)) / 60;
+
     let matched = null;
-    for (const [key, t] of Object.entries(THRESH)) {
-      if (excess >= t.min && excess <= t.max) { matched = { key, ...t }; break; }
-    }
-    if (matched) {
-      // Extend the event while readings remain in this tier
-      let j = i + 1;
-      let sumKw = fd[i].consumption_kw;
-      while (j < fd.length) {
-        const ex2 = fd[j].consumption_kw - baseline;
-        if (ex2 >= matched.min * 0.6) { sumKw += fd[j].consumption_kw; j++; }
-        else break;
+    for (const app of APPLIANCES) {
+      if (excess >= app.minExcess && excess <= app.maxExcess && app.timeOk(hour)) {
+        matched = app; break;
       }
-      const dur = (j - i);
-      if (dur >= 2) { // at least 10 min
-        const kwh    = sumKw / dur * dur * INTERVAL_H;
+    }
+
+    if (matched) {
+      let j = i + 1;
+      let sumKw = row.consumption_kw;
+      // Extend while still in signature band (allow 40% dip for thermostat cycling)
+      while (j < fd.length) {
+        const ex2   = fd[j].consumption_kw - baseline;
+        const hour2 = parseInt(fd[j].time.slice(11,13)) + parseInt(fd[j].time.slice(14,16)) / 60;
+        if (ex2 >= matched.minExcess * 0.4 && matched.timeOk(hour2)) {
+          sumKw += fd[j].consumption_kw; j++;
+        } else break;
+      }
+      const dur   = j - i;
+      if (dur >= matched.minDur) {
         const avgKw  = sumKw / dur;
+        const kwh    = avgKw * dur * INTERVAL_H;
         const startT = fd[i].time.slice(11,16);
-        const endT   = fd[Math.min(j,fd.length-1)].time.slice(11,16);
-        events.push({ ...matched, startT, endT, avgKw, kwh, readings: dur });
+        const endT   = fd[Math.min(j, fd.length-1)].time.slice(11,16);
+        events.push({ ...matched, startT, endT, avgKw, kwh, dur });
       }
       i = j;
     } else {
@@ -3358,11 +3442,14 @@ function renderNilm() {
 
   // ── Bucket totals for donut ─────────────────────────────────────────────────
   const buckets = {
-    geyser:   { label: 'Geyser/Heating', icon: '🌡️', colour: '#F97316', kwh: 0 },
-    cooking:  { label: 'Cooking/Oven',   icon: '🍳', colour: '#EF4444', kwh: 0 },
-    pool:     { label: 'Pool/Sustained', icon: '🌀', colour: '#3B82F6', kwh: 0 },
-    elevated: { label: 'Elevated',       icon: '⚡', colour: '#A78BFA', kwh: 0 },
-    baseline: { label: 'Always-on',      icon: '🔌', colour: '#475569', kwh: 0 },
+    geyser_main:    { label: 'Main Geyser',    icon: '🌡️', colour: '#F97316', kwh: 0 },
+    geyser_laundry: { label: 'Laundry Geyser', icon: '🚿', colour: '#FB923C', kwh: 0 },
+    cooking:        { label: 'Cooking/Oven',   icon: '🍳', colour: '#EF4444', kwh: 0 },
+    pool:           { label: 'Pool Pump',       icon: '🌀', colour: '#3B82F6', kwh: 0 },
+    washing:        { label: 'Washing',         icon: '🧺', colour: '#8B5CF6', kwh: 0 },
+    aircon:         { label: 'Air Con',         icon: '❄️', colour: '#06B6D4', kwh: 0 },
+    elevated:       { label: 'Other',           icon: '⚡', colour: '#A78BFA', kwh: 0 },
+    baseline:       { label: 'Always-on',       icon: '🔌', colour: '#475569', kwh: 0 },
   };
   events.forEach(e => { if (buckets[e.key]) buckets[e.key].kwh += e.kwh; });
 
