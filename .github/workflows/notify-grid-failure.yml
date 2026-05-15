@@ -1,0 +1,232 @@
+# .github/workflows/notify-grid-failure.yml
+#
+# Detects when the grid has failed (gone off-grid) and sends a WhatsApp
+# notification so you can be mindful of power usage.
+# Also sends an all-clear when the grid is restored.
+#
+# Required GitHub Secrets:
+#   WHATSAPP_PHONE    Your phone number with country code
+#   WHATSAPP_APIKEY   Your CallMeBot API key
+#   WHATSAPP_PHONE2   Second phone number
+#   WHATSAPP_APIKEY2  Second CallMeBot API key
+
+name: Notify — Grid Failure
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "Send a test notification without affecting the grid status flag"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "test_failure"
+          - "test_restored"
+
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check grid status and notify on change
+        env:
+          WHATSAPP_PHONE:   ${{ secrets.WHATSAPP_PHONE }}
+          WHATSAPP_APIKEY:  ${{ secrets.WHATSAPP_APIKEY }}
+          WHATSAPP_PHONE2:  ${{ secrets.WHATSAPP_PHONE2 }}
+          WHATSAPP_APIKEY2: ${{ secrets.WHATSAPP_APIKEY2 }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, urllib.request, urllib.parse, datetime
+
+          PHONE    = os.environ["WHATSAPP_PHONE"]
+          APIKEY   = os.environ["WHATSAPP_APIKEY"]
+          PHONE2   = os.environ["WHATSAPP_PHONE2"]
+          APIKEY2  = os.environ["WHATSAPP_APIKEY2"]
+          FLAG     = "data/.grid_status"   # contains "online" or "offline"
+
+          def send_whatsapp(msg):
+              encoded = urllib.parse.quote(msg)
+              for phone, apikey in [(PHONE, APIKEY), (PHONE2, APIKEY2)]:
+                  url = f"https://api.callmebot.com/whatsapp.php?phone={phone}&text={encoded}&apikey={apikey}"
+                  try:
+                      urllib.request.urlopen(url)
+                      print(f"  ✅ Sent to {phone[-4:]}")
+                  except Exception as e:
+                      print(f"  ✗ Failed to send to {phone[-4:]}: {e}")
+
+
+          # ── Test mode ────────────────────────────────────────────────────
+          test_mode = os.environ.get("TEST_MODE", "false")
+          if test_mode == "test_failure":
+              print("🧪 TEST MODE: Sending fake grid failure notification")
+              msg = (
+                  f"🧪 *[TEST] Grid Failure Detected!*\n"
+                  f"This is a test notification only — your grid is fine.\n\n"
+                  f"🔋 Battery SOC: *85%*\n"
+                  f"🏠 Current load: *2.50 kW*\n"
+                  f"⏱ Estimated runtime: *5.5 hrs* at current usage\n\n"
+                  f"💡 Consider switching off non-essential appliances to extend battery life.\n"
+                  f"🕐 [TEST TIME] SAST"
+              )
+              send_whatsapp(msg)
+              print("🧪 Test complete — flag NOT updated")
+              exit(0)
+          elif test_mode == "test_restored":
+              print("🧪 TEST MODE: Sending fake grid restored notification")
+              msg = (
+                  f"🧪 *[TEST] Grid Restored!*\n"
+                  f"This is a test notification only — your grid is fine.\n\n"
+                  f"🔋 Battery SOC: *72%*\n"
+                  f"🕐 [TEST TIME] SAST"
+              )
+              send_whatsapp(msg)
+              print("🧪 Test complete — flag NOT updated")
+              exit(0)
+
+          # ── Load latest data ──────────────────────────────────────────────
+          try:
+              with open("data/latest.json") as f:
+                  data = json.load(f)
+              rows = data.get("rows", [])
+          except Exception as e:
+              print(f"Could not read latest.json: {e}")
+              exit(0)
+
+          if len(rows) < 3:
+              print("Not enough rows yet")
+              exit(0)
+
+          # ── Determine current grid status ─────────────────────────────────
+          # Use last 3 readings (~15-20 min) to avoid false triggers from
+          # momentary dips. Grid is considered offline only if ALL recent
+          # readings show zero grid AND the system has meaningful load
+          # (rules out nighttime / low-demand periods where grid just isn't needed)
+          recent      = rows[-3:]
+          last        = rows[-1]
+          time_str    = last.get("time", "")[-8:-3] + " SAST"
+          soc         = last.get("soc_pct", 0)
+          load        = last.get("consumption_kw", 0)
+          grid_values = [r.get("grid_kw", 0) for r in recent]
+          pv_values   = [r.get("pv_kw", 0)   for r in recent]
+
+          # Grid is "active" if any reading shows non-zero grid power
+          grid_active = any(abs(g) > 0.05 for g in grid_values)
+
+          # System has meaningful load (not idle/sleeping)
+          has_load    = load > 0.1
+
+          # If there's no load at all, we can't reliably detect grid state
+          if not has_load:
+              print(f"System load is {load:.2f} kW — too low to detect grid state reliably")
+              exit(0)
+
+          # Determine current state
+          # Grid is offline if: no grid power AND no PV (night) is NOT the case
+          # i.e. it's daytime (PV > 0) OR load > 0.5 kW but still no grid draw
+          # More robust: if grid was previously online and now shows 0 across
+          # multiple readings while load exists, flag as offline
+          grid_is_online = grid_active
+
+          # Also treat as online if PV alone is covering load (can't distinguish
+          # intentional off-grid from failure) — only flag if battery is
+          # discharging AND no PV AND no grid (clear grid failure scenario)
+          battery_kw  = last.get("battery_kw", 0)
+          pv_now      = last.get("pv_kw", 0)
+          all_pv_zero = all(p < 0.1 for p in pv_values)
+
+          # Clear grid failure: no grid, no PV, battery discharging to cover load
+          clear_failure = (not grid_active) and all_pv_zero and battery_kw > 0.2
+
+          # Possible failure: no grid, has PV (could be solar covering load, or
+          # could be genuine failure + solar) — only alert if flag was online
+          possible_failure = (not grid_active) and (not all_pv_zero)
+
+          print(f"Grid active:      {grid_active} (values: {[round(g,3) for g in grid_values]})")
+          print(f"PV now:           {pv_now:.2f} kW | All PV zero: {all_pv_zero}")
+          print(f"Battery:          {battery_kw:.2f} kW | SOC: {soc}%")
+          print(f"Load:             {load:.2f} kW")
+          print(f"Clear failure:    {clear_failure}")
+          print(f"Possible failure: {possible_failure}")
+
+          # ── Read previous flag ────────────────────────────────────────────
+          prev_status = "online"
+          if os.path.exists(FLAG):
+              with open(FLAG) as f:
+                  prev_status = f.read().strip()
+          print(f"Previous status:  {prev_status}")
+
+          def write_flag(status):
+              os.makedirs("data", exist_ok=True)
+              with open(FLAG, "w") as f:
+                  f.write(status)
+
+          # ── State machine ─────────────────────────────────────────────────
+          if clear_failure and prev_status == "online":
+              # Grid just failed
+              msg = (
+                  f"🔌❌ *Grid Failure Detected!*\n"
+                  f"The grid has gone down. Your solar system has switched to battery/UPS mode.\n\n"
+                  f"🔋 Battery SOC: *{soc}%*\n"
+                  f"🏠 Current load: *{load:.2f} kW*\n"
+                  f"⏱ Estimated runtime: *{(soc/100 * 16.07 / load):.1f} hrs* at current usage\n\n"
+                  f"💡 Consider switching off non-essential appliances to extend battery life.\n"
+                  f"🕐 {time_str}"
+              )
+              print("⚠ Grid failure detected — sending notification")
+              send_whatsapp(msg)
+              write_flag("offline")
+
+          elif possible_failure and prev_status == "online":
+              # Ambiguous — PV is running but no grid draw; wait for confirmation
+              # by writing a "pending" state; if next run also shows no grid, alert
+              write_flag("pending")
+              print("Grid draw zero but PV is active — writing pending state, will confirm next run")
+
+          elif possible_failure and prev_status == "pending":
+              # Two consecutive runs with no grid + PV active — likely a real failure
+              msg = (
+                  f"🔌⚠️ *Grid May Be Down*\n"
+                  f"No grid activity detected for the last ~20 minutes.\n"
+                  f"Your solar system is running on PV + battery.\n\n"
+                  f"🔋 Battery SOC: *{soc}%*\n"
+                  f"☀️ PV output: *{pv_now:.2f} kW*\n"
+                  f"🏠 Current load: *{load:.2f} kW*\n\n"
+                  f"💡 Monitor your battery level — it will drain faster after sunset.\n"
+                  f"🕐 {time_str}"
+              )
+              print("⚠ Persistent no-grid state — sending possible failure notification")
+              send_whatsapp(msg)
+              write_flag("offline")
+
+          elif grid_is_online and prev_status in ("offline", "pending"):
+              # Grid has been restored
+              msg = (
+                  f"🔌✅ *Grid Restored!*\n"
+                  f"Mains power is back. Your system has reconnected to the grid.\n\n"
+                  f"🔋 Battery SOC: *{soc}%*\n"
+                  f"🕐 {time_str}"
+              )
+              print("✅ Grid restored — sending all-clear notification")
+              send_whatsapp(msg)
+              write_flag("online")
+
+          else:
+              print(f"No state change (grid {'online' if grid_is_online else 'offline'}, prev: {prev_status}) — no notification")
+
+          PYEOF
+
+      - name: Commit grid status flag if updated
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/.grid_status 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: grid status flag update"
+          git push 2>/dev/null || true
