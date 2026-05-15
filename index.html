@@ -955,6 +955,41 @@
     </div>
   </div>
 
+
+  <!-- LOAD FINGERPRINTING (NILM) -->
+  <div class="insights-card" style="margin-top:16px" id="nilmPanel">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleNilm()">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div class="insights-title" style="margin-bottom:0">🔍 Load Fingerprinting</div>
+        <div style="font-size:0.72rem;color:var(--muted)" id="nilmStatus">Analysing today's load…</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:0.7rem;color:#ECEDEF" id="nilmHint">tap to expand</span>
+        <div id="nilmArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
+      </div>
+    </div>
+    <div id="nilmBody" style="max-height:0;overflow:hidden;transition:max-height 0.5s ease,opacity 0.3s ease;opacity:0;">
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <!-- Disclaimer -->
+        <div style="font-size:0.68rem;color:var(--muted);background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:14px;">
+          ⚠️ Estimates only — inferred from 5-min aggregate load data. Not metered circuit data.
+        </div>
+        <!-- Two column layout: events left, donut right -->
+        <div style="display:grid;grid-template-columns:1fr 140px;gap:16px;align-items:start;">
+          <!-- Event timeline -->
+          <div id="nilmEvents"></div>
+          <!-- Donut chart -->
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <canvas id="nilmDonut" width="130" height="130"></canvas>
+            <div id="nilmLegend" style="font-size:0.62rem;color:var(--muted);line-height:1.7;text-align:left;width:100%;"></div>
+          </div>
+        </div>
+        <!-- Battery impact bar -->
+        <div id="nilmBatteryImpact" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:0.75rem;color:var(--muted);"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- LOAD SHIFTING -->
   <div class="insights-card" style="margin-top:16px" id="loadShiftPanel">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleLoadShift()">
@@ -1588,10 +1623,12 @@ function rebuildChartsFromPeriod() {
     initSlider();
     renderKPIs();
     updateStatusBadge();
+    if (nilmOpen) renderNilm();
   } else {
     buildAggregatedCharts(periodData);
     renderAggregatedKPIs(periodData);
     renderInsights();
+    if (nilmOpen) renderNilm();
   }
 }
 
@@ -2837,6 +2874,7 @@ function startPowerFlowAnimation() {
 
 let loadShiftOpen = false;
 let insightsOpen  = false;
+let nilmOpen      = false;
 
 function toggleLoadShift() {
   loadShiftOpen = !loadShiftOpen;
@@ -3236,6 +3274,191 @@ async function init() {
 }
 
 init();
+
+
+// ============================================================
+// LOAD FINGERPRINTING (NILM)
+// ============================================================
+function toggleNilm() {
+  nilmOpen = !nilmOpen;
+  const body  = document.getElementById('nilmBody');
+  const arrow = document.getElementById('nilmArrow');
+  const hint  = document.getElementById('nilmHint');
+  if (nilmOpen) {
+    renderNilm();
+    body.style.maxHeight = '1200px';
+    body.style.opacity   = '1';
+    arrow.style.transform = 'rotate(180deg)';
+    hint.textContent = 'tap to collapse'; hint.style.color = '#ECEDEF';
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.style.transform = '';
+    hint.textContent = 'tap to expand'; hint.style.color = '#ECEDEF';
+  }
+}
+
+function renderNilm() {
+  const fd = filteredData();
+  if (!fd || fd.length < 3) {
+    document.getElementById('nilmStatus').textContent = 'Not enough data';
+    return;
+  }
+
+  const BAT_CAPACITY = 16.07; // kWh
+
+  // ── Detect load events ──────────────────────────────────────────────────────
+  // Classify each 5-min reading into a load tier
+  const INTERVAL_H = 5 / 60;
+
+  // Build overnight baseline (00:00–05:00): median consumption
+  const nightRows  = fd.filter(r => { const h = parseInt(r.time.slice(11,13)); return h >= 0 && h < 5; });
+  const nightCons  = nightRows.map(r => r.consumption_kw).sort((a,b) => a-b);
+  const baseline   = nightCons.length ? nightCons[Math.floor(nightCons.length / 2)] : 0.35;
+
+  // Signature thresholds (above baseline)
+  const THRESH = {
+    geyser:   { min: 1.6,  max: 4.0,  label: 'Geyser / Heating',  icon: '🌡️', colour: '#F97316' },
+    cooking:  { min: 0.9,  max: 4.0,  label: 'Cooking / Oven',     icon: '🍳', colour: '#EF4444' },
+    pool:     { min: 0.55, max: 1.8,  label: 'Pool / Sustained',   icon: '🌀', colour: '#3B82F6' },
+    elevated: { min: 0.3,  max: 0.55, label: 'Elevated Load',      icon: '⚡', colour: '#A78BFA' },
+  };
+
+  // Scan for contiguous high-load events (≥2 consecutive readings = ≥10 min)
+  const events = [];
+  let i = 0;
+  while (i < fd.length) {
+    const excess = fd[i].consumption_kw - baseline;
+    let matched = null;
+    for (const [key, t] of Object.entries(THRESH)) {
+      if (excess >= t.min && excess <= t.max) { matched = { key, ...t }; break; }
+    }
+    if (matched) {
+      // Extend the event while readings remain in this tier
+      let j = i + 1;
+      let sumKw = fd[i].consumption_kw;
+      while (j < fd.length) {
+        const ex2 = fd[j].consumption_kw - baseline;
+        if (ex2 >= matched.min * 0.6) { sumKw += fd[j].consumption_kw; j++; }
+        else break;
+      }
+      const dur = (j - i);
+      if (dur >= 2) { // at least 10 min
+        const kwh    = sumKw / dur * dur * INTERVAL_H;
+        const avgKw  = sumKw / dur;
+        const startT = fd[i].time.slice(11,16);
+        const endT   = fd[Math.min(j,fd.length-1)].time.slice(11,16);
+        events.push({ ...matched, startT, endT, avgKw, kwh, readings: dur });
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+
+  // ── Bucket totals for donut ─────────────────────────────────────────────────
+  const buckets = {
+    geyser:   { label: 'Geyser/Heating', icon: '🌡️', colour: '#F97316', kwh: 0 },
+    cooking:  { label: 'Cooking/Oven',   icon: '🍳', colour: '#EF4444', kwh: 0 },
+    pool:     { label: 'Pool/Sustained', icon: '🌀', colour: '#3B82F6', kwh: 0 },
+    elevated: { label: 'Elevated',       icon: '⚡', colour: '#A78BFA', kwh: 0 },
+    baseline: { label: 'Always-on',      icon: '🔌', colour: '#475569', kwh: 0 },
+  };
+  events.forEach(e => { if (buckets[e.key]) buckets[e.key].kwh += e.kwh; });
+
+  // Always-on baseline: night hours * baseline kW
+  const totalConsKwh = fd.reduce((s,r) => s + r.consumption_kw * INTERVAL_H, 0);
+  const eventKwh     = events.reduce((s,e) => s + e.kwh, 0);
+  buckets.baseline.kwh = Math.max(0, totalConsKwh - eventKwh);
+
+  // ── Render event timeline ───────────────────────────────────────────────────
+  const evEl = document.getElementById('nilmEvents');
+  if (events.length === 0) {
+    evEl.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:8px 0;">No significant load events detected today.</div>';
+  } else {
+    evEl.innerHTML = events.map(e => {
+      const socImpact = (e.kwh / BAT_CAPACITY * 100).toFixed(0);
+      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:1.3rem;flex-shrink:0;padding-top:1px;">${e.icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.78rem;font-weight:600;color:var(--text);">${e.label}</div>
+          <div style="font-size:0.68rem;color:var(--muted);">${e.startT} – ${e.endT} &nbsp;·&nbsp; avg ${e.avgKw.toFixed(1)} kW</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:0.82rem;font-weight:700;color:${e.colour};">${e.kwh.toFixed(1)} kWh</div>
+          <div style="font-size:0.62rem;color:var(--muted);">~${socImpact}% SOC</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Status line ─────────────────────────────────────────────────────────────
+  const statusEl = document.getElementById('nilmStatus');
+  statusEl.textContent = events.length
+    ? `${events.length} load event${events.length > 1 ? 's' : ''} detected · ${totalConsKwh.toFixed(1)} kWh total`
+    : `No high-load events · ${totalConsKwh.toFixed(1)} kWh total`;
+
+  // ── Battery impact summary ──────────────────────────────────────────────────
+  const impactEl = document.getElementById('nilmBatteryImpact');
+  const highEvents = events.filter(e => e.kwh > 0.3);
+  if (highEvents.length) {
+    const topEvent = highEvents.reduce((a,b) => a.kwh > b.kwh ? a : b);
+    const pct = (topEvent.kwh / BAT_CAPACITY * 100).toFixed(0);
+    impactEl.innerHTML = `🔋 <b>Biggest battery impact:</b> ${topEvent.icon} ${topEvent.label} (${topEvent.startT}) used ~${topEvent.kwh.toFixed(1)} kWh, reducing SOC by ~${pct}%.`;
+  } else {
+    impactEl.innerHTML = '';
+  }
+
+  // ── Draw donut chart ────────────────────────────────────────────────────────
+  const canvas = document.getElementById('nilmDonut');
+  if (!canvas) return;
+  const ctx  = canvas.getContext('2d');
+  const cx   = canvas.width  / 2;
+  const cy   = canvas.height / 2;
+  const R    = 52;
+  const r    = 30;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const slices = Object.values(buckets).filter(b => b.kwh > 0.01);
+  const total  = slices.reduce((s,b) => s + b.kwh, 0) || 1;
+  let angle    = -Math.PI / 2;
+
+  slices.forEach(b => {
+    const sweep = (b.kwh / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R, angle, angle + sweep);
+    ctx.closePath();
+    ctx.fillStyle = b.colour;
+    ctx.fill();
+    angle += sweep;
+  });
+
+  // Donut hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.fillStyle = '#1E293B';
+  ctx.fill();
+
+  // Centre label
+  ctx.fillStyle = '#F1F5F9';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(totalConsKwh.toFixed(1), cx, cy - 6);
+  ctx.font = '9px sans-serif';
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillText('kWh', cx, cy + 8);
+
+  // Legend
+  const legEl = document.getElementById('nilmLegend');
+  legEl.innerHTML = slices.map(b =>
+    `<div style="display:flex;align-items:center;gap:5px;">
+      <div style="width:8px;height:8px;border-radius:2px;background:${b.colour};flex-shrink:0;"></div>
+      <span>${b.icon} ${b.label}</span>
+    </div>`
+  ).join('');
+}
 
 // ============================================================
 // AUTO-REFRESH: re-fetch latest.json every 10 minutes so the
