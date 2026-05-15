@@ -35,6 +35,8 @@ jobs:
 
           PHONE      = os.environ["WHATSAPP_PHONE"]
           APIKEY     = os.environ["WHATSAPP_APIKEY"]
+          PHONE2     = os.environ["WHATSAPP_PHONE2"]
+          APIKEY2    = os.environ["WHATSAPP_APIKEY2"]
           FLAG       = "data/.notified_high_grid"
           THRESHOLD  = 6.5  # kW
 
