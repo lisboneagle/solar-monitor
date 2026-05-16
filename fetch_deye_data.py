@@ -282,33 +282,40 @@ try:
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
 
-# ── Step 5c: Probe device/latest for per-string PV data ──────────────────────
+# ── Step 5c: Probe multiple endpoints for per-string PV data ─────────────────
 DEVICE_SN = "2601290507"
-print(f"  Probing device/latest for per-string PV data (SN: {DEVICE_SN})...")
-try:
-    device_resp = post("device/latest", {"deviceSn": DEVICE_SN}, token=token)
-    device_block = device_resp.get("data", device_resp)
-    device_items = []
-    if isinstance(device_block, list):
-        device_items = device_block
-    elif isinstance(device_block, dict):
-        device_items = (device_block.get("list") or
-                        device_block.get("dataList") or
-                        [device_block])
-    print(f"  📋 ALL device/latest fields:")
-    for item in device_items:
-        # Print all fields — looking for pv1Power, pv2Power, pv1Voltage etc.
-        all_fields = json.dumps(item, default=str)
-        print(f"    {all_fields[:3000]}")
-        # Highlight PV string fields specifically
-        pv_fields = {k: v for k, v in item.items()
-                     if any(x in k.lower() for x in ['pv1', 'pv2', 'string', 'mppt'])}
-        if pv_fields:
-            print(f"  ✅ PV string fields found: {pv_fields}")
-        else:
-            print(f"  ⚠ No pv1/pv2/string/mppt fields found in this item")
-except Exception as e:
-    print(f"  ⚠ device/latest probe failed: {e}")
+print(f"  Probing endpoints for per-string PV data (SN: {DEVICE_SN})...")
+
+def probe_endpoint(path, payload):
+    try:
+        resp = post(path, payload, token=token)
+        block = resp.get("data", resp)
+        items = []
+        if isinstance(block, list):
+            items = block
+        elif isinstance(block, dict):
+            items = (block.get("list") or block.get("dataList") or
+                     block.get("stationDataItems") or [block])
+        print(f"  📋 /{path} response ({len(items)} items):")
+        for item in items[:2]:
+            print(f"    {json.dumps(item, default=str)[:2000]}")
+            pv_fields = {k: v for k, v in (item.items() if isinstance(item, dict) else []
+                         ) if any(x in str(k).lower() for x in ['pv1','pv2','string','mppt','dc'])}
+            if pv_fields:
+                print(f"  ✅ PV string fields: {pv_fields}")
+        return True
+    except Exception as e:
+        print(f"  ✗ /{path} failed: {e}")
+        return False
+
+# Try all plausible Deye API paths for per-string data
+probe_endpoint("device/latest",          {"deviceSn": DEVICE_SN})
+probe_endpoint("device/last",            {"deviceSn": DEVICE_SN})
+probe_endpoint("inverter/realtime",      {"deviceSn": DEVICE_SN})
+probe_endpoint("inverter/latest",        {"deviceSn": DEVICE_SN})
+probe_endpoint("device/realtime/latest", {"deviceSn": DEVICE_SN})
+probe_endpoint("station/device",         {"stationId": int(station_id)})
+probe_endpoint("device/list",            {"stationId": int(station_id)})
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
