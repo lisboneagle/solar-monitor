@@ -3103,7 +3103,10 @@ async function renderLoadShifting() {
 
   // ── LEFT COLUMN: Today ────────────────────────────────────────────────────
   let left = '';
-  const todayLabel = now.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short' });
+  // Build label from SAST date string directly to avoid browser timezone re-applying
+  const _todayKey   = dateToKeySAST();
+  const _todayDt    = new Date(_todayKey + 'T12:00:00');
+  const todayLabel  = _todayDt.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short' });
   const todayCloud = forecasts?.today?.cloud ?? null;
   const todayEff   = forecasts?.today ? Math.round(forecasts.today.efficiency * 100) : null;
   const todayWx    = wxData?.daily?.weathercode
