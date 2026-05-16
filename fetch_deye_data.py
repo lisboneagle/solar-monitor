@@ -146,11 +146,6 @@ raw_records = (data_block.get("stationDataItems") or
                data_block.get("records") or
                (data_block if isinstance(data_block, list) else []))
 print(f"  ✓ Received {len(raw_records)} records")
-if raw_records:
-    print(f"  📋 Raw record sample keys: {list(raw_records[0].keys())}")
-    pv_fields = {k:v for k,v in raw_records[0].items()
-                 if any(x in str(k).lower() for x in ['pv','dp','dv','dc','mppt','string','power'])}
-    print(f"  📋 PV-related raw fields (first record): {pv_fields}")
 
 if len(raw_records) == 0:
     print(f"  ⚠ Raw response: {json.dumps(history_resp)[:800]}")
@@ -198,8 +193,7 @@ WATT_FIELDS = {"production_kw", "consumption_kw", "ups_kw", "grid_kw", "battery_
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
-           "pv_kw": 0.0, "pv1_kw": 0.0, "pv2_kw": 0.0,
-           "generator_kw": 0, "grid_inverter_kw": 0}
+           "pv_kw": 0.0, "generator_kw": 0, "grid_inverter_kw": 0}
     ups_kw = 0.0
     for k, dk in FIELD_MAP.items():
         if k in r and r[k] is not None:
@@ -221,10 +215,6 @@ def normalise(r, time_str):
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]
-    # Per-string PV: split 50/50 by default; overridden for latest row
-    # by actual device API values if available (see Step 5c)
-    out["pv1_kw"] = round(out["pv_kw"] / 2, 3)
-    out["pv2_kw"] = round(out["pv_kw"] / 2, 3)
     return out
 
 rows = []
@@ -241,11 +231,6 @@ rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Normalised {len(rows)} rows from history")
 if rows:
     print(f"  Last history record: {rows[-1]['time']}")
-
-# Per-string PV values — set here so station/latest block can reference them
-# (Deye API doesn't expose per-string data; 50/50 split used via normalise())
-pv1_latest = None
-pv2_latest = None
 
 # ── Step 5b: Fetch station/latest — always used for latest.json ──────────────
 latest_row = None
@@ -284,11 +269,7 @@ try:
             time_str = str(raw_t).replace("T", " ")[:19]
 
         latest_row = normalise(item, time_str)
-        # Override pv1/pv2 with real device values if we got them
-        if pv1_latest is not None:
-            latest_row["pv1_kw"] = pv1_latest
-            latest_row["pv2_kw"] = pv2_latest
-        print(f"  ✓ station/latest record: {time_str} | PV={latest_row['pv_kw']}kW (PV1={latest_row['pv1_kw']}kW PV2={latest_row['pv2_kw']}kW) grid={latest_row['grid_kw']}kW bat={latest_row['battery_kw']}kW soc={latest_row['soc_pct']}%")
+        print(f"  ✓ station/latest record: {time_str} | PV={latest_row['pv_kw']}kW grid={latest_row['grid_kw']}kW bat={latest_row['battery_kw']}kW soc={latest_row['soc_pct']}%")
 
         # Add to today's archive rows if it's today's date
         if time_str[:10] == target_date:
