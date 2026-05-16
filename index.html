@@ -1339,16 +1339,20 @@ function headerSubtitleHTML(prettyDate, rows) {
 // ============================================================
 // ── SAST helpers (UTC+2, no DST) ────────────────────────────
 function nowSAST() {
+  // Returns a Date whose UTC fields (getUTC*) represent current SAST time.
+  // SAST = UTC+2, always. We convert by adding 120 min to the UTC timestamp.
+  // Do NOT use getTimezoneOffset() — if the browser is already in SAST it
+  // returns -120, which would double-add the offset and push past midnight.
   const now = new Date();
-  return new Date(now.getTime() + (2 * 60 - now.getTimezoneOffset()) * 60000);
+  return new Date(now.getTime() + 120 * 60000);
 }
 function dateToKeySAST() {
   const s = nowSAST();
-  return `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`;
+  return `${s.getUTCFullYear()}-${String(s.getUTCMonth()+1).padStart(2,'0')}-${String(s.getUTCDate()).padStart(2,'0')}`;
 }
 function nowHourSAST() {
   const s = nowSAST();
-  return s.getHours() + s.getMinutes() / 60;
+  return s.getUTCHours() + s.getUTCMinutes() / 60;
 }
 // ────────────────────────────────────────────────────────────
 
@@ -1441,7 +1445,7 @@ function resetPeriod() {
 
 function getPeriodDateRange() {
   const now = nowSAST();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const today = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
   if (currentPeriod === 'day') {
     const d = new Date(today);
@@ -3108,7 +3112,7 @@ async function renderLoadShifting() {
   const _sast = nowSAST();
   const _days  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const _months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const todayLabel = `${_days[_sast.getDay()]} ${_sast.getDate()} ${_months[_sast.getMonth()]}`;
+  const todayLabel = `${_days[_sast.getUTCDay()]} ${_sast.getUTCDate()} ${_months[_sast.getUTCMonth()]}`;
   const todayCloud = forecasts?.today?.cloud ?? null;
   const todayEff   = forecasts?.today ? Math.round(forecasts.today.efficiency * 100) : null;
   const todayWx    = wxData?.daily?.weathercode
@@ -3607,7 +3611,8 @@ setInterval(async () => {
     loadPeriodData();
     loadWeather().then(() => renderLoadShifting());
 
-    const loadTime = nowSAST().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const _lt = nowSAST();
+    const loadTime = `${String(_lt.getUTCHours()).padStart(2,'0')}:${String(_lt.getUTCMinutes()).padStart(2,'0')}`;
     document.getElementById('dataInputHint').textContent = `Last updated: ${json.date} | ${loadTime}`;
     console.log(`[auto-refresh] Data updated to ${newLast}`);
   } catch (e) {
