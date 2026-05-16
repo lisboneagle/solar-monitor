@@ -2782,8 +2782,8 @@ function updatePowerFlowDiagram() {
 
   const gridImport    = grid > 0.01;
   const gridExport    = grid < -0.01;
-  const batCharging   = battery < -0.05;
-  const batDischarging = battery > 0.05;
+  const batCharging   = battery < -0.01;
+  const batDischarging = battery > 0.01;
   const batActive     = batCharging || batDischarging;
   const batKw         = Math.abs(battery);
 
