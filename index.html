@@ -727,7 +727,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="togglePowerFlow()">
     <div class="insights-title" style="margin-bottom:0">⚡ Live Power Flow</div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:0.7rem;color:#475569" id="powerFlowHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
+      <span style="font-size:0.7rem;color:#ECEDEF" id="powerFlowHint">tap to expand</span>
       <div id="powerFlowArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
     </div>
   </div>
@@ -934,7 +934,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleInsights()">
       <div class="insights-title" style="margin-bottom:0">📊 Key Insights</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="insightsHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
+        <span style="font-size:0.7rem;color:#ECEDEF" id="insightsHint">tap to expand</span>
         <div id="insightsArrow" style="
           width:28px;height:28px;
           border-radius:50%;
@@ -1000,7 +1000,7 @@
         <div style="font-size:0.72rem;color:var(--muted)" id="loadShiftStatus">Calculating…</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="loadShiftHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
+        <span style="font-size:0.7rem;color:#ECEDEF" id="loadShiftHint">tap to expand</span>
         <div id="loadShiftArrow" style="
           width:28px;height:28px;
           border-radius:50%;
@@ -1052,7 +1052,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleDataInput()">
       <div class="insights-title" style="margin-bottom:0">📂 System Data Input</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:0.7rem;color:#475569" id="dataInputHint" style="font-size:0.7rem;color:#ECEDEF">tap to expand</span>
+        <span style="font-size:0.7rem;color:#ECEDEF" id="dataInputHint">tap to expand</span>
         <div id="dataInputArrow" style="
           width:28px;height:28px;border-radius:50%;
           background:rgba(255,255,255,0.06);
@@ -3103,10 +3103,12 @@ async function renderLoadShifting() {
 
   // ── LEFT COLUMN: Today ────────────────────────────────────────────────────
   let left = '';
-  // Build label from SAST date string directly to avoid browser timezone re-applying
-  const _todayKey   = dateToKeySAST();
-  const _todayDt    = new Date(_todayKey + 'T12:00:00');
-  const todayLabel  = _todayDt.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short' });
+  // Build label directly from SAST components — never use Date constructor
+  // (browser TZ shifts can corrupt weekday even when date number is correct)
+  const _sast = nowSAST();
+  const _days  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const _months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const todayLabel = `${_days[_sast.getDay()]} ${_sast.getDate()} ${_months[_sast.getMonth()]}`;
   const todayCloud = forecasts?.today?.cloud ?? null;
   const todayEff   = forecasts?.today ? Math.round(forecasts.today.efficiency * 100) : null;
   const todayWx    = wxData?.daily?.weathercode
@@ -3169,8 +3171,10 @@ async function renderLoadShifting() {
   let right = '';
   if (tmrSolar && forecasts?.tomorrow) {
     const tmrDate  = forecasts.tomorrow.date;
-    const tmrDt    = new Date(tmrDate + 'T12:00:00');
-    const tmrLabel = tmrDt.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'short' });
+    // Parse tmrDate (YYYY-MM-DD) directly to avoid Date constructor TZ issues
+    const _tmrParts = tmrDate.split('-').map(Number);
+    const _tmrDt    = new Date(_tmrParts[0], _tmrParts[1] - 1, _tmrParts[2], 12, 0, 0);
+    const tmrLabel  = `${_days[_tmrDt.getDay()]} ${_tmrDt.getDate()} ${_months[_tmrDt.getMonth()]}`;
     const tmrCloud = forecasts.tomorrow.cloud;
     const tmrEff   = Math.round(forecasts.tomorrow.efficiency * 100);
     const tmrCode  = wxData?.daily?.weathercode?.[wxData.daily.time.indexOf(tmrDate)] ?? 0;
