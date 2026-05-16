@@ -282,6 +282,34 @@ try:
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
 
+# ── Step 5c: Probe device/latest for per-string PV data ──────────────────────
+DEVICE_SN = "2601290507"
+print(f"  Probing device/latest for per-string PV data (SN: {DEVICE_SN})...")
+try:
+    device_resp = post("device/latest", {"deviceSn": DEVICE_SN}, token=token)
+    device_block = device_resp.get("data", device_resp)
+    device_items = []
+    if isinstance(device_block, list):
+        device_items = device_block
+    elif isinstance(device_block, dict):
+        device_items = (device_block.get("list") or
+                        device_block.get("dataList") or
+                        [device_block])
+    print(f"  📋 ALL device/latest fields:")
+    for item in device_items:
+        # Print all fields — looking for pv1Power, pv2Power, pv1Voltage etc.
+        all_fields = json.dumps(item, default=str)
+        print(f"    {all_fields[:3000]}")
+        # Highlight PV string fields specifically
+        pv_fields = {k: v for k, v in item.items()
+                     if any(x in k.lower() for x in ['pv1', 'pv2', 'string', 'mppt'])}
+        if pv_fields:
+            print(f"  ✅ PV string fields found: {pv_fields}")
+        else:
+            print(f"  ⚠ No pv1/pv2/string/mppt fields found in this item")
+except Exception as e:
+    print(f"  ⚠ device/latest probe failed: {e}")
+
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
 if rows:
