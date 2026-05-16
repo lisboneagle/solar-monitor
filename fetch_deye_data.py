@@ -216,8 +216,8 @@ def normalise(r, time_str):
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]
-    # Per-string PV: Deye EU1 API doesn't expose pv1/pv2 separately,
-    # so split 50/50 (strings are equal capacity on opposite roof sides)
+    # Per-string PV: split 50/50 by default; overridden for latest row
+    # by actual device API values if available (see Step 5c)
     out["pv1_kw"] = round(out["pv_kw"] / 2, 3)
     out["pv2_kw"] = round(out["pv_kw"] / 2, 3)
     return out
@@ -274,7 +274,11 @@ try:
             time_str = str(raw_t).replace("T", " ")[:19]
 
         latest_row = normalise(item, time_str)
-        print(f"  ✓ station/latest record: {time_str} | PV={latest_row['pv_kw']}kW grid={latest_row['grid_kw']}kW bat={latest_row['battery_kw']}kW soc={latest_row['soc_pct']}%")
+        # Override pv1/pv2 with real device values if we got them
+        if pv1_latest is not None:
+            latest_row["pv1_kw"] = pv1_latest
+            latest_row["pv2_kw"] = pv2_latest
+        print(f"  ✓ station/latest record: {time_str} | PV={latest_row['pv_kw']}kW (PV1={latest_row['pv1_kw']}kW PV2={latest_row['pv2_kw']}kW) grid={latest_row['grid_kw']}kW bat={latest_row['battery_kw']}kW soc={latest_row['soc_pct']}%")
 
         # Add to today's archive rows if it's today's date
         if time_str[:10] == target_date:
@@ -287,8 +291,72 @@ try:
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
 
-# Note: Deye EU1 developer API does not expose per-string PV data.
-# pv1_kw and pv2_kw are estimated as pv_kw / 2 (equal string assumption).
+# ── Step 5c: Fetch per-string PV data from device-level endpoint ─────────────
+DEVICE_SN = "2601290507"
+pv1_latest = None
+pv2_latest = None
+print(f"  Fetching per-string PV data (SN: {DEVICE_SN})...")
+
+def try_device_endpoint(path, payload):
+    try:
+        resp = post(path, payload, token=token)
+        block = resp.get("data", resp)
+        items = []
+        if isinstance(block, list):
+            items = block
+        elif isinstance(block, dict):
+            items = (block.get("list") or block.get("dataList") or
+                     block.get("stationDataItems") or block.get("infos") or
+                     block.get("records") or [block])
+        for item in items:
+            if not isinstance(item, dict): continue
+            # Look for pv1/pv2 power fields in any form
+            pv1 = (item.get("pv1Power") or item.get("pv1InputPower") or
+                   item.get("PV1Power") or item.get("dc1Power"))
+            pv2 = (item.get("pv2Power") or item.get("pv2InputPower") or
+                   item.get("PV2Power") or item.get("dc2Power"))
+            if pv1 is not None or pv2 is not None:
+                print(f"  ✅ Found per-string data in /{path}: pv1={pv1} pv2={pv2}")
+                print(f"     Full item keys: {list(item.keys())}")
+                return pv1, pv2
+            # Print all keys so we can find the right field name
+            print(f"  📋 /{path} item keys: {list(item.keys())[:30]}")
+            pv_like = {k:v for k,v in item.items()
+                      if any(x in str(k).lower() for x in ['pv','dc','mppt','string','power','volt','curr'])}
+            if pv_like:
+                print(f"     PV-like fields: {pv_like}")
+        return None, None
+    except Exception as e:
+        print(f"  ✗ /{path} failed: {e}")
+        return None, None
+
+# Try device/latest with different payload formats
+for payload in [
+    {"deviceSn": DEVICE_SN},
+    {"sn": DEVICE_SN},
+    {"inverterSn": DEVICE_SN},
+    {"deviceId": DEVICE_SN},
+]:
+    pv1_latest, pv2_latest = try_device_endpoint("device/latest", payload)
+    if pv1_latest is not None: break
+
+# Try device/realtime
+if pv1_latest is None:
+    for payload in [{"deviceSn": DEVICE_SN}, {"sn": DEVICE_SN}]:
+        pv1_latest, pv2_latest = try_device_endpoint("device/realtime", payload)
+        if pv1_latest is not None: break
+
+# Try station/latest/device
+if pv1_latest is None:
+    pv1_latest, pv2_latest = try_device_endpoint(
+        "station/latest", {"stationId": int(station_id), "deviceSn": DEVICE_SN})
+
+if pv1_latest is not None:
+    pv1_latest = round(float(pv1_latest) / 1000, 3)
+    pv2_latest = round(float(pv2_latest) / 1000, 3) if pv2_latest else 0.0
+    print(f"  ✅ PV1={pv1_latest}kW PV2={pv2_latest}kW")
+else:
+    print(f"  ⚠ Could not retrieve per-string data — will use 50/50 split")
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
