@@ -106,11 +106,8 @@ jobs:
               exit(0)
 
           # ── Determine current grid status ─────────────────────────────────
-          # Use last 3 readings (~15-20 min) to avoid false triggers from
-          # momentary dips. Grid is considered offline only if ALL recent
-          # readings show zero grid AND the system has meaningful load
-          # (rules out nighttime / low-demand periods where grid just isn't needed)
-          recent      = rows[-3:]
+          # Use last 6 readings (~30 min) for more reliable state detection
+          recent      = rows[-6:] if len(rows) >= 6 else rows
           last        = rows[-1]
           time_str    = last.get("time", "")[-8:-3] + " SAST"
           soc         = last.get("soc_pct", 0)
@@ -118,64 +115,81 @@ jobs:
           grid_values = [r.get("grid_kw", 0) for r in recent]
           pv_values   = [r.get("pv_kw", 0)   for r in recent]
 
-          # Grid considered active if MAJORITY of recent readings show > 0.15 kW
-          grid_active = sum(1 for g in grid_values if abs(g) > 0.15) >= 2
-
           battery_kw  = last.get("battery_kw", 0)
           pv_now      = last.get("pv_kw", 0)
           all_pv_zero = all(p < 0.1 for p in pv_values)
 
           # ── Time-of-day guard ─────────────────────────────────────────────
-          # Extract SAST hour from timestamp (timestamps are already SAST)
           try:
               from datetime import datetime
               ts   = last.get("time", "")
-              hour = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").hour +                      datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").minute / 60
+              dt   = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+              hour = dt.hour + dt.minute / 60
           except Exception:
-              hour = 12  # fallback to midday if parse fails
+              hour = 12
 
           is_night = hour >= 19.0 or hour < 7.0
 
-          # ── SOC trajectory (is battery draining unusually fast?) ──────────
-          # Use last 6 readings (~30 min) to compute SOC drop rate
+          # ── Transition detection: did grid JUST drop? ─────────────────────
+          # Key insight: your inverter runs on battery by choice at night even
+          # when the grid is available. So "no grid now" is NOT a failure signal.
+          # A real failure is: grid was CONSISTENTLY present, then suddenly gone.
+          #
+          # Look at a longer window (last 12 readings = ~1 hour):
+          # - "was_on_grid": grid was clearly active in the first half of the window
+          # - "now_off_grid": grid has been absent in ALL of the last 3 readings
+          # Both must be true simultaneously for a genuine failure.
+          long_window   = rows[-12:] if len(rows) >= 12 else rows
+          first_half    = long_window[:len(long_window)//2]
+          last_3        = rows[-3:]
+
+          was_on_grid   = sum(1 for r in first_half if abs(r.get("grid_kw", 0)) > 0.15) >= 2
+          now_off_grid  = all(abs(r.get("grid_kw", 0)) <= 0.15 for r in last_3)
+          grid_active   = sum(1 for g in grid_values if abs(g) > 0.15) >= 2
+          grid_is_online = grid_active
+
+          # ── SOC trajectory ────────────────────────────────────────────────
           soc_values  = [r.get("soc_pct", soc) for r in rows[-6:]]
-          soc_drop    = soc_values[0] - soc_values[-1]   # positive = draining
-          # Normal overnight drain: ~0.5-1% per 5 min at typical load
-          # Abnormal: >3% drop per 30 min suggests unexpected heavy load
-          rapid_drain = soc_drop > 3.0
+          soc_drop    = soc_values[0] - soc_values[-1]
 
           # System has meaningful load
           has_load = load > 0.1
-
           if not has_load:
               print(f"System load is {load:.2f} kW — too low to detect grid state reliably")
               exit(0)
 
-          grid_is_online = grid_active
-
           # ── Failure classification ────────────────────────────────────────
-          # NIGHT RULES: battery-only at night is NORMAL — only alert if:
-          #   - SOC is draining rapidly (unexpected heavy load), OR
-          #   - Load is unusually high for nighttime (>2 kW, e.g. aircon + geyser)
-          # DAY RULES: no grid + no PV + battery discharging = clear failure
-          #            no grid + PV active = possible failure (2-run confirm)
+          # ONLY flag as failure if there was a clear TRANSITION:
+          # grid was present → grid is now gone
+          # This prevents false alarms when inverter simply runs on battery
+          # by choice (normal evening/night operation)
+          #
+          # Additional guard: during known solar-only hours (10:00-16:00)
+          # the inverter may not draw from grid at all even when it's available
+          # so we also require PV to be zero to confirm it's not just solar cover
+          is_solar_hours = 10.0 <= hour <= 16.0
 
           if is_night:
-              # At night, only flag as failure if drain is abnormally rapid
-              # Normal: battery covers modest load (0.3-1.5 kW) — not a failure
-              clear_failure    = (not grid_active) and all_pv_zero and rapid_drain and load > 1.5
-              possible_failure = (not grid_active) and all_pv_zero and rapid_drain and load > 1.0
+              # Night: only alert on genuine transition AND abnormally high load
+              # Normal night load for this home: 0.3-1.5 kW from battery
+              # Abnormal: >3 kW sustained at night with grid gone = likely real failure
+              clear_failure    = was_on_grid and now_off_grid and all_pv_zero and load > 3.0
+              possible_failure = was_on_grid and now_off_grid and all_pv_zero and load > 2.0
+          elif is_solar_hours:
+              # Solar hours: grid may not be drawing even if available
+              # Only flag if PV is also zero (overcast + no grid = likely failure)
+              clear_failure    = was_on_grid and now_off_grid and all_pv_zero and battery_kw > 0.2
+              possible_failure = False  # too ambiguous during solar hours
           else:
-              # Daytime: clear failure = no grid, no PV, battery discharging
-              clear_failure    = (not grid_active) and all_pv_zero and battery_kw > 0.2
-              # Possible failure: no grid but PV active — wait for 2nd confirmation
-              possible_failure = (not grid_active) and (not all_pv_zero)
+              # Daytime non-solar: transition + no PV = clear failure
+              clear_failure    = was_on_grid and now_off_grid and all_pv_zero and battery_kw > 0.2
+              possible_failure = was_on_grid and now_off_grid and (not all_pv_zero)
 
-          print(f"Grid active:      {grid_active} (values: {[round(g,3) for g in grid_values]})")
+          print(f"Grid active:      {grid_active} (recent values: {[round(g,3) for g in grid_values[-3:]]})")
+          print(f"Was on grid:      {was_on_grid} | Now off grid: {now_off_grid}")
           print(f"PV now:           {pv_now:.2f} kW | All PV zero: {all_pv_zero}")
           print(f"Battery:          {battery_kw:.2f} kW | SOC: {soc}% | SOC drop (30min): {soc_drop:.1f}%")
-          print(f"Load:             {load:.2f} kW | Hour: {hour:.1f} | Night: {is_night}")
-          print(f"Rapid drain:      {rapid_drain}")
+          print(f"Load:             {load:.2f} kW | Hour: {hour:.1f} | Night: {is_night} | Solar hrs: {is_solar_hours}")
           print(f"Clear failure:    {clear_failure}")
           print(f"Possible failure: {possible_failure}")
 
