@@ -146,6 +146,11 @@ raw_records = (data_block.get("stationDataItems") or
                data_block.get("records") or
                (data_block if isinstance(data_block, list) else []))
 print(f"  ✓ Received {len(raw_records)} records")
+if raw_records:
+    print(f"  📋 Raw record sample keys: {list(raw_records[0].keys())}")
+    pv_fields = {k:v for k,v in raw_records[0].items()
+                 if any(x in str(k).lower() for x in ['pv','dp','dv','dc','mppt','string','power'])}
+    print(f"  📋 PV-related raw fields (first record): {pv_fields}")
 
 if len(raw_records) == 0:
     print(f"  ⚠ Raw response: {json.dumps(history_resp)[:800]}")
@@ -237,6 +242,11 @@ print(f"  ✓ Normalised {len(rows)} rows from history")
 if rows:
     print(f"  Last history record: {rows[-1]['time']}")
 
+# Per-string PV values — set here so station/latest block can reference them
+# (Deye API doesn't expose per-string data; 50/50 split used via normalise())
+pv1_latest = None
+pv2_latest = None
+
 # ── Step 5b: Fetch station/latest — always used for latest.json ──────────────
 latest_row = None
 try:
@@ -291,72 +301,7 @@ try:
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
 
-# ── Step 5c: Fetch per-string PV data from device-level endpoint ─────────────
-DEVICE_SN = "2601290507"
-pv1_latest = None
-pv2_latest = None
-print(f"  Fetching per-string PV data (SN: {DEVICE_SN})...")
 
-def try_device_endpoint(path, payload):
-    try:
-        resp = post(path, payload, token=token)
-        block = resp.get("data", resp)
-        items = []
-        if isinstance(block, list):
-            items = block
-        elif isinstance(block, dict):
-            items = (block.get("list") or block.get("dataList") or
-                     block.get("stationDataItems") or block.get("infos") or
-                     block.get("records") or [block])
-        for item in items:
-            if not isinstance(item, dict): continue
-            # Look for pv1/pv2 power fields in any form
-            pv1 = (item.get("pv1Power") or item.get("pv1InputPower") or
-                   item.get("PV1Power") or item.get("dc1Power"))
-            pv2 = (item.get("pv2Power") or item.get("pv2InputPower") or
-                   item.get("PV2Power") or item.get("dc2Power"))
-            if pv1 is not None or pv2 is not None:
-                print(f"  ✅ Found per-string data in /{path}: pv1={pv1} pv2={pv2}")
-                print(f"     Full item keys: {list(item.keys())}")
-                return pv1, pv2
-            # Print all keys so we can find the right field name
-            print(f"  📋 /{path} item keys: {list(item.keys())[:30]}")
-            pv_like = {k:v for k,v in item.items()
-                      if any(x in str(k).lower() for x in ['pv','dc','mppt','string','power','volt','curr'])}
-            if pv_like:
-                print(f"     PV-like fields: {pv_like}")
-        return None, None
-    except Exception as e:
-        print(f"  ✗ /{path} failed: {e}")
-        return None, None
-
-# Try device/latest with different payload formats
-for payload in [
-    {"deviceSn": DEVICE_SN},
-    {"sn": DEVICE_SN},
-    {"inverterSn": DEVICE_SN},
-    {"deviceId": DEVICE_SN},
-]:
-    pv1_latest, pv2_latest = try_device_endpoint("device/latest", payload)
-    if pv1_latest is not None: break
-
-# Try device/realtime
-if pv1_latest is None:
-    for payload in [{"deviceSn": DEVICE_SN}, {"sn": DEVICE_SN}]:
-        pv1_latest, pv2_latest = try_device_endpoint("device/realtime", payload)
-        if pv1_latest is not None: break
-
-# Try station/latest/device
-if pv1_latest is None:
-    pv1_latest, pv2_latest = try_device_endpoint(
-        "station/latest", {"stationId": int(station_id), "deviceSn": DEVICE_SN})
-
-if pv1_latest is not None:
-    pv1_latest = round(float(pv1_latest) / 1000, 3)
-    pv2_latest = round(float(pv2_latest) / 1000, 3) if pv2_latest else 0.0
-    print(f"  ✅ PV1={pv1_latest}kW PV2={pv2_latest}kW")
-else:
-    print(f"  ⚠ Could not retrieve per-string data — will use 50/50 split")
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
