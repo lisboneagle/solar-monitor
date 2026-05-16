@@ -193,7 +193,8 @@ WATT_FIELDS = {"production_kw", "consumption_kw", "ups_kw", "grid_kw", "battery_
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
-           "pv_kw": 0.0, "generator_kw": 0, "grid_inverter_kw": 0}
+           "pv_kw": 0.0, "pv1_kw": 0.0, "pv2_kw": 0.0,
+           "generator_kw": 0, "grid_inverter_kw": 0}
     ups_kw = 0.0
     for k, dk in FIELD_MAP.items():
         if k in r and r[k] is not None:
@@ -215,6 +216,10 @@ def normalise(r, time_str):
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]
+    # Per-string PV: Deye EU1 API doesn't expose pv1/pv2 separately,
+    # so split 50/50 (strings are equal capacity on opposite roof sides)
+    out["pv1_kw"] = round(out["pv_kw"] / 2, 3)
+    out["pv2_kw"] = round(out["pv_kw"] / 2, 3)
     return out
 
 rows = []
@@ -282,40 +287,8 @@ try:
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
 
-# ── Step 5c: Probe multiple endpoints for per-string PV data ─────────────────
-DEVICE_SN = "2601290507"
-print(f"  Probing endpoints for per-string PV data (SN: {DEVICE_SN})...")
-
-def probe_endpoint(path, payload):
-    try:
-        resp = post(path, payload, token=token)
-        block = resp.get("data", resp)
-        items = []
-        if isinstance(block, list):
-            items = block
-        elif isinstance(block, dict):
-            items = (block.get("list") or block.get("dataList") or
-                     block.get("stationDataItems") or [block])
-        print(f"  📋 /{path} response ({len(items)} items):")
-        for item in items[:2]:
-            print(f"    {json.dumps(item, default=str)[:2000]}")
-            pv_fields = {k: v for k, v in (item.items() if isinstance(item, dict) else []
-                         ) if any(x in str(k).lower() for x in ['pv1','pv2','string','mppt','dc'])}
-            if pv_fields:
-                print(f"  ✅ PV string fields: {pv_fields}")
-        return True
-    except Exception as e:
-        print(f"  ✗ /{path} failed: {e}")
-        return False
-
-# Try all plausible Deye API paths for per-string data
-probe_endpoint("device/latest",          {"deviceSn": DEVICE_SN})
-probe_endpoint("device/last",            {"deviceSn": DEVICE_SN})
-probe_endpoint("inverter/realtime",      {"deviceSn": DEVICE_SN})
-probe_endpoint("inverter/latest",        {"deviceSn": DEVICE_SN})
-probe_endpoint("device/realtime/latest", {"deviceSn": DEVICE_SN})
-probe_endpoint("station/device",         {"stationId": int(station_id)})
-probe_endpoint("device/list",            {"stationId": int(station_id)})
+# Note: Deye EU1 developer API does not expose per-string PV data.
+# pv1_kw and pv2_kw are estimated as pv_kw / 2 (equal string assumption).
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
