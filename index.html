@@ -2804,14 +2804,14 @@ function updatePowerFlowDiagram() {
     el.className.baseVal = active ? cls : 'pf-idle';
   }
 
-  setLine('pfl-solar', solar > 0.05, solar, '#22C55E', 'pf-dash');
+  setLine('pfl-solar', solar > 0.005, solar, '#22C55E', 'pf-dash');
   setLine('pfl-grid',  gridImport || gridExport, Math.abs(grid),
     gridImport ? '#F5276C' : '#22C55E',
     gridExport ? 'pf-dash-rev' : 'pf-dash');
   setLine('pfl-bat', batActive, batKw,
     batCharging ? '#8B5CF6' : '#14B8A6',
     batDischarging ? 'pf-dash-rev' : 'pf-dash');
-  setLine('pfl-load', load > 0.05, load, '#EAB308', 'pf-dash');
+  setLine('pfl-load', load > 0.005, load, '#EAB308', 'pf-dash');
 
   // Node values
   document.getElementById('pf-val-solar').textContent  = solar.toFixed(2) + ' kW';
