@@ -49,6 +49,12 @@ jobs:
           TARGET_DATE:     ${{ github.event.inputs.target_date }}
         run: python fetch_deye_data.py
 
+      - name: Fetch per-string PV data (PV1/PV2)
+        env:
+          DEYE_WEB_EMAIL:    ${{ secrets.DEYE_EMAIL }}
+          DEYE_WEB_PASSWORD: ${{ secrets.DEYE_PASSWORD }}
+        run: python fetch_deye_pv_strings.py
+
       - name: Commit and push data
         run: |
           git config user.name  "github-actions[bot]"
