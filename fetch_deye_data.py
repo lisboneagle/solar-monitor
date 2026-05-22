@@ -193,7 +193,8 @@ WATT_FIELDS = {"production_kw", "consumption_kw", "ups_kw", "grid_kw", "battery_
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
-           "pv_kw": 0.0, "generator_kw": 0, "grid_inverter_kw": 0}
+           "pv_kw": 0.0, "pv1_kw": 0.0, "pv2_kw": 0.0,
+           "generator_kw": 0, "grid_inverter_kw": 0}
     ups_kw = 0.0
     for k, dk in FIELD_MAP.items():
         if k in r and r[k] is not None:
@@ -215,6 +216,9 @@ def normalise(r, time_str):
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]
+    # pv1_kw/pv2_kw: default to 50/50 split; overwritten by fetch_deye_pv_strings.py
+    out["pv1_kw"] = round(out["pv_kw"] / 2, 3)
+    out["pv2_kw"] = round(out["pv_kw"] / 2, 3)
     return out
 
 rows = []
