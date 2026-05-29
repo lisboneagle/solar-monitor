@@ -39,34 +39,20 @@ def is_success(data):
     code = str(data.get("code", ""))
     return data.get("success", False) or code in ("0", "200", "1000000")
 
-def post(path, payload, token=None, query_params=None, retries=3, retry_delay=15):
-    import time
+def post(path, payload, token=None, query_params=None):
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"bearer {token}"
     url = f"{BASE_URL}/{path}"
     if query_params:
         url += "?" + "&".join(f"{k}={v}" for k, v in query_params.items())
-    last_err = None
-    for attempt in range(1, retries + 1):
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=30)
-            if resp.status_code >= 500:
-                raise requests.HTTPError(f"Server error {resp.status_code}", response=resp)
-            resp.raise_for_status()
-            data = resp.json()
-            print(f"    → /{path} code: {data.get('code')} success: {data.get('success')}")
-            if not is_success(data):
-                raise RuntimeError(f"API error on /{path}: {data}")
-            return data
-        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as e:
-            last_err = e
-            if attempt < retries:
-                print(f"    ⚠ Attempt {attempt}/{retries} failed ({e}) — retrying in {retry_delay}s...")
-                time.sleep(retry_delay)
-            else:
-                print(f"    ✗ All {retries} attempts failed for /{path}")
-    raise last_err
+    resp = requests.post(url, headers=headers, json=payload, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    print(f"    → /{path} code: {data.get('code')} success: {data.get('success')}")
+    if not is_success(data):
+        raise RuntimeError(f"API error on /{path}: {data}")
+    return data
 
 # ── Step 1: Authenticate ──────────────────────────────────────────────────────
 # Per official sample code:
@@ -154,22 +140,18 @@ if len(raw_records) == 0:
 FIELD_MAP = {
     "generationPower":  "production_kw",
     "productionPower":  "production_kw",
-    # consumption — these are ADDITIVE: UPS load + non-UPS home load = total load
-    # They are kept separate here and summed in normalise()
     "consumptionPower": "consumption_kw",
+    "upsPower":         "consumption_kw",
+    "upsLoadPower":     "consumption_kw",
     "loadPower":        "consumption_kw",
     "acOutputPower":    "consumption_kw",
-    # UPS / backed-up load — separate circuit on Deye, must be ADDED to consumption
-    "upsPower":         "ups_kw",
-    "upsLoadPower":     "ups_kw",
     "purchasePower":    "grid_kw",
     "wirePower":        "grid_kw",
     "gridPower":        "grid_kw",
     "gridConsumptionPower": "grid_kw",
     "uploadPower":      "grid_kw",       # grid export (negative)
     "batteryPower":     "battery_kw",
-    "dischargePower":   "battery_kw",
-    "chargePower":      "battery_kw",
+    "chargePower":      "battery_kw",    # will be negated below if needed
     "batterySOC":       "soc_pct",
     "SOC":              "soc_pct",
     "soc":              "soc_pct",
@@ -188,13 +170,12 @@ def unix_to_timestr(ts):
         return str(ts)
 
 # These fields are always in watts from the Deye API → convert to kW
-WATT_FIELDS = {"production_kw", "consumption_kw", "ups_kw", "grid_kw", "battery_kw", "pv_kw", "generator_kw"}
+WATT_FIELDS = {"production_kw", "consumption_kw", "grid_kw", "battery_kw", "pv_kw", "generator_kw"}
 
 def normalise(r, time_str):
     out = {"time": time_str, "production_kw": 0.0, "consumption_kw": 0.0,
            "grid_kw": 0.0, "battery_kw": 0.0, "soc_pct": 0.0,
            "pv_kw": 0.0, "generator_kw": 0, "grid_inverter_kw": 0}
-    ups_kw = 0.0
     for k, dk in FIELD_MAP.items():
         if k in r and r[k] is not None:
             try:
@@ -202,16 +183,9 @@ def normalise(r, time_str):
                 # Always convert W → kW for power fields
                 if dk in WATT_FIELDS:
                     val = round(val / 1000, 3)
-                if dk == "ups_kw":
-                    ups_kw += val   # accumulate UPS load separately
-                else:
-                    out[dk] = val
+                out[dk] = val
             except (ValueError, TypeError):
                 pass
-    # Sum UPS load into total consumption — they are separate circuits on Deye
-    if ups_kw > 0:
-        out["consumption_kw"] = round(out["consumption_kw"] + ups_kw, 3)
-        print(f"    \u2139 UPS load {ups_kw:.3f} kW + non-UPS {out['consumption_kw'] - ups_kw:.3f} kW = total {out['consumption_kw']:.3f} kW")
     # Deye API uses generationPower for both production and PV — mirror to pv_kw
     if out["pv_kw"] == 0.0 and out["production_kw"] > 0:
         out["pv_kw"] = out["production_kw"]
@@ -248,8 +222,6 @@ try:
                         [latest_block])
 
     for item in latest_items:
-        # Print ALL fields to find the correct load field name
-        print(f"  📋 ALL station/latest fields: {json.dumps(item, default=str)[:1500]}")
         raw_t = (item.get("lastUpdateTime") or
                  item.get("timeStamp") or
                  item.get("updateTime") or
@@ -281,8 +253,6 @@ try:
 
 except Exception as e:
     print(f"  ⚠ station/latest failed (non-critical): {e}")
-
-
 
 rows.sort(key=lambda r: r["time"])
 print(f"  ✓ Total rows after merge: {len(rows)}")
