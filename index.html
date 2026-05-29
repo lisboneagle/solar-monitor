@@ -832,6 +832,53 @@
   </div>
 </div>
 
+<!-- APPLIANCE LIBRARY -->
+<div style="background:var(--card);border-bottom:1px solid var(--border);padding:14px 28px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleApplianceLibrary()">
+    <div class="insights-title" style="margin-bottom:0">📋 Appliance Library</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:0.7rem;color:#475569" id="libraryHint">tap to expand</span>
+      <div id="libraryArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
+    </div>
+  </div>
+  <div id="libraryBody" style="max-height:0;overflow:hidden;transition:max-height 0.4s ease,opacity 0.3s ease;opacity:0;">
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+
+      <!-- Library table -->
+      <div id="libraryTable"></div>
+
+      <!-- Add appliance form -->
+      <div style="margin-top:14px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px dashed var(--border);">
+        <div style="font-size:0.75rem;font-weight:700;color:#F1F5F9;margin-bottom:10px;">➕ Add / Edit Appliance</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:end;" id="addApplianceForm">
+          <div>
+            <div style="font-size:0.62rem;color:#64748B;margin-bottom:3px;">ICON</div>
+            <input id="newIcon" type="text" value="🔌" maxlength="2" style="width:100%;background:#1E293B;border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:#F1F5F9;font-size:1rem;box-sizing:border-box;">
+          </div>
+          <div>
+            <div style="font-size:0.62rem;color:#64748B;margin-bottom:3px;">NAME</div>
+            <input id="newName" type="text" placeholder="e.g. Kettle" style="width:100%;background:#1E293B;border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:#F1F5F9;font-size:0.78rem;box-sizing:border-box;">
+          </div>
+          <div>
+            <div style="font-size:0.62rem;color:#64748B;margin-bottom:3px;">MIN kW</div>
+            <input id="newMin" type="number" step="0.1" placeholder="e.g. 1.5" style="width:100%;background:#1E293B;border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:#F1F5F9;font-size:0.78rem;box-sizing:border-box;">
+          </div>
+          <div>
+            <div style="font-size:0.62rem;color:#64748B;margin-bottom:3px;">MAX kW</div>
+            <input id="newMax" type="number" step="0.1" placeholder="e.g. 2.5" style="width:100%;background:#1E293B;border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:#F1F5F9;font-size:0.78rem;box-sizing:border-box;">
+          </div>
+        </div>
+        <button onclick="addApplianceToLibrary()" style="margin-top:10px;background:#3B82F6;border:none;border-radius:6px;padding:5px 16px;color:#fff;font-size:0.75rem;cursor:pointer;font-family:inherit;">+ Add to Library</button>
+      </div>
+
+      <!-- Baseline note -->
+      <div style="margin-top:10px;padding:8px 12px;border-radius:6px;background:rgba(255,255,255,0.02);font-size:0.68rem;color:#475569;">
+        🏠 Baseline (always-on): <strong style="color:#94A3B8">0.44 kW</strong> — fridge, router, lights, standby loads
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="main">
 
   <!-- PERIOD FILTER -->
@@ -2662,9 +2709,8 @@ function renderWeather() {
 }
 
 
-// ============================================================
-// ACTIVE APPLIANCE DETECTOR
-// ============================================================
+
+
 let applianceOpen = false;
 
 function toggleApplianceDetector() {
@@ -2687,83 +2733,97 @@ function toggleApplianceDetector() {
 }
 
 // Appliance fingerprint library — calibrated from 2026-05-29 data
-const APPLIANCE_FINGERPRINTS = [
-  {
-    name: 'Dishwasher',
-    icon: '🍽️',
-    colour: '#3B82F6',
-    minDelta: 2.8,   // min kW above baseline to trigger
-    maxDelta: 5.5,   // max kW above baseline
-    // Cyclic pattern — consumption oscillates as it heats then pumps
-    cyclic: true,
-    minDuration: 3,  // must persist for at least 3 readings (15 min)
-  },
-  {
-    name: 'Stove / Oven',
-    icon: '🍳',
-    colour: '#EF4444',
-    minDelta: 2.0,
-    maxDelta: 5.5,
-    cyclic: true,
-    minDuration: 1,
-  },
-  {
-    name: 'Pool Pump + Geyser',
-    icon: '🏊🚿',
-    colour: '#14B8A6',
-    minDelta: 2.5,
-    maxDelta: 3.8,
-    cyclic: false,
-    minDuration: 6,  // runs for at least 30 min
-    timeWindow: { start: 9, end: 14 }, // timer window
-  },
-  {
-    name: 'Outside Geyser',
-    icon: '🚿',
-    colour: '#F59E0B',
-    minDelta: 1.6,
-    maxDelta: 2.8,
-    cyclic: false,
-    minDuration: 4,
-    timeWindow: { start: 9, end: 17 },
-  },
-  {
-    name: 'Pool Pump',
-    icon: '🏊',
-    colour: '#06B6D4',
-    minDelta: 0.6,
-    maxDelta: 1.2,
-    cyclic: false,
-    minDuration: 6,
-    timeWindow: { start: 9, end: 14 },
-  },
-  {
-    name: 'Washing Machine',
-    icon: '🫧',
-    colour: '#8B5CF6',
-    minDelta: 1.5,
-    maxDelta: 2.8,
-    cyclic: true,
-    minDuration: 3,
-  },
+// ============================================================
+// NILM — Non-Intrusive Load Monitoring
+// Appliance fingerprints persist via storage API
+// ============================================================
+
+const NILM_STORAGE_KEY = 'nilm-appliances';
+const NILM_EVENTS_KEY  = 'nilm-events';
+
+// Default fingerprints — calibrated from 2026-05-29 observed data
+const DEFAULT_FINGERPRINTS = [
+  { name:'Dishwasher',        icon:'🍽️', colour:'#3B82F6', minDelta:2.8, maxDelta:5.5, cyclic:true,  minDuration:3, observations:1, lastSeen:null, active:true },
+  { name:'Stove / Oven',      icon:'🍳', colour:'#EF4444', minDelta:2.0, maxDelta:5.5, cyclic:true,  minDuration:1, observations:1, lastSeen:null, active:true },
+  { name:'Pool Pump + Geyser',icon:'🏊🚿',colour:'#14B8A6', minDelta:2.5, maxDelta:3.8, cyclic:false, minDuration:6, timeWindow:{start:9,end:14}, observations:1, lastSeen:null, active:true },
+  { name:'Outside Geyser',    icon:'🚿', colour:'#F59E0B', minDelta:1.6, maxDelta:2.8, cyclic:false, minDuration:4, timeWindow:{start:9,end:17}, observations:1, lastSeen:null, active:true },
+  { name:'Pool Pump',         icon:'🏊', colour:'#06B6D4', minDelta:0.6, maxDelta:1.2, cyclic:false, minDuration:6, timeWindow:{start:9,end:14}, observations:1, lastSeen:null, active:true },
+  { name:'Washing Machine',   icon:'🫧', colour:'#8B5CF6', minDelta:1.5, maxDelta:2.8, cyclic:true,  minDuration:3, observations:1, lastSeen:null, active:true },
 ];
 
-const BASELINE_KW = 0.44; // always-on loads: fridge, router, lights
+// Live fingerprints array — loaded from storage or defaults
+let APPLIANCE_FINGERPRINTS = [];
 
+const BASELINE_KW = 0.44;
+const LIB_COLOURS = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#F97316','#14B8A6','#EC4899'];
+
+// ── Persistence helpers — localStorage for GitHub Pages ───────────────────────
+function nilmLoad() {
+  try {
+    const saved = localStorage.getItem(NILM_STORAGE_KEY);
+    APPLIANCE_FINGERPRINTS = saved && JSON.parse(saved).length > 0
+      ? JSON.parse(saved)
+      : JSON.parse(JSON.stringify(DEFAULT_FINGERPRINTS));
+    console.log(`✓ NILM: loaded ${APPLIANCE_FINGERPRINTS.length} fingerprints`);
+  } catch (e) {
+    APPLIANCE_FINGERPRINTS = JSON.parse(JSON.stringify(DEFAULT_FINGERPRINTS));
+  }
+}
+
+function nilmSave() {
+  try {
+    localStorage.setItem(NILM_STORAGE_KEY, JSON.stringify(APPLIANCE_FINGERPRINTS));
+  } catch (e) { console.warn('NILM save failed:', e); }
+}
+
+function nilmLoadEvents() {
+  try {
+    const stored = localStorage.getItem(NILM_EVENTS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (e) { return []; }
+}
+
+function nilmSaveEvent(event) {
+  try {
+    const events = nilmLoadEvents();
+    events.push(event);
+    localStorage.setItem(NILM_EVENTS_KEY, JSON.stringify(events.slice(-500)));
+  } catch (e) {}
+}
+
+function nilmLearn(fpIdx, observedKw, durationReadings) {
+  const fp = APPLIANCE_FINGERPRINTS[fpIdx];
+  if (!fp) return;
+
+  const alpha = 0.2; // 80% existing, 20% new observation
+  fp.minDelta    = +(fp.minDelta * (1-alpha) + Math.max(0.1, observedKw*0.85) * alpha).toFixed(2);
+  fp.maxDelta    = +(fp.maxDelta * (1-alpha) + observedKw*1.15 * alpha).toFixed(2);
+  fp.observations = (fp.observations || 0) + 1;
+  fp.lastSeen    = new Date().toISOString().slice(0, 10);
+
+  // Log event for history
+  nilmSaveEvent({
+    name:      fp.name,
+    kw:        parseFloat(observedKw.toFixed(3)),
+    duration:  durationReadings,
+    timestamp: new Date().toISOString(),
+  });
+
+  nilmSave();
+}
+
+// ── Detection ──────────────────────────────────────────────────────────────
 function updateApplianceDetector() {
   if (!DATA || DATA.length === 0) return;
 
   const now     = new Date();
   const nowHour = now.getHours() + now.getMinutes() / 60;
 
-  // Use last 6 readings (~30 min) to assess current state
   const recent  = DATA.slice(-6);
   const avgCons = recent.reduce((s, r) => s + (r.consumption_kw || 0), 0) / recent.length;
   const delta   = Math.max(0, avgCons - BASELINE_KW);
   const lastTime = DATA[DATA.length - 1]?.time || '';
-  const lastCons = DATA[DATA.length - 1]?.consumption_kw || 0;
 
-  // Count consecutive readings above each threshold
   function consecutiveAbove(threshold) {
     let count = 0;
     for (let i = DATA.length - 1; i >= 0; i--) {
@@ -2773,27 +2833,31 @@ function updateApplianceDetector() {
     return count;
   }
 
-  // Detect active appliances
-  const detected = [];
-  let accountedFor = BASELINE_KW;
+  const detected    = [];
+  let accountedFor  = BASELINE_KW;
 
-  for (const fp of APPLIANCE_FINGERPRINTS) {
-    // Check time window if defined
-    if (fp.timeWindow) {
-      if (nowHour < fp.timeWindow.start || nowHour > fp.timeWindow.end) continue;
-    }
+  for (let i = 0; i < APPLIANCE_FINGERPRINTS.length; i++) {
+    const fp = APPLIANCE_FINGERPRINTS[i];
+    if (fp.active === false) continue;
+    if (fp.timeWindow && (nowHour < fp.timeWindow.start || nowHour > fp.timeWindow.end)) continue;
 
     const consecutive = consecutiveAbove(fp.minDelta * 0.7);
     const inRange     = delta >= fp.minDelta && delta <= fp.maxDelta + 1.0;
     const longEnough  = consecutive >= fp.minDuration;
 
     if (inRange && longEnough) {
-      // Estimate this appliance's contribution
       const estKw = Math.min(delta - (accountedFor - BASELINE_KW), fp.maxDelta);
       if (estKw < fp.minDelta * 0.5) continue;
-      detected.push({ ...fp, estKw, consecutive });
+      detected.push({ ...fp, fpIdx: i, estKw, consecutive });
       accountedFor += estKw;
-      if (accountedFor >= avgCons - 0.1) break; // fully accounted for
+
+      // Trigger learning update every 6 readings (30 min confirmed match)
+      if (consecutive === 6 || consecutive === 12) {
+        nilmLearn(i, estKw, consecutive);
+        nilmSaveEvent({ date: new Date().toISOString().slice(0,10), time: lastTime.slice(11,16), appliance: fp.name, kw: +estKw.toFixed(2), duration: consecutive * 5 });
+      }
+
+      if (accountedFor >= avgCons - 0.1) break;
     }
   }
 
@@ -2802,77 +2866,166 @@ function updateApplianceDetector() {
   let html = `<div style="font-size:0.68rem;color:#475569;margin-bottom:10px;">Based on last 30 min avg · ${timeStr}</div>`;
 
   if (avgCons < BASELINE_KW + 0.15) {
-    // Only baseline running
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);margin-bottom:6px;">
-        <span style="font-size:1.4rem">🏠</span>
-        <div>
-          <div style="font-size:0.85rem;font-weight:600;color:#F1F5F9">Baseline only</div>
-          <div style="font-size:0.72rem;color:#64748B">Fridge · Router · Lights · ~${BASELINE_KW} kW</div>
-        </div>
-        <div style="margin-left:auto;font-size:0.82rem;font-weight:700;color:#94A3B8">${avgCons.toFixed(2)} kW</div>
-      </div>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);margin-bottom:6px;">
+      <span style="font-size:1.4rem">🏠</span>
+      <div><div style="font-size:0.85rem;font-weight:600;color:#F1F5F9">Baseline only</div>
+      <div style="font-size:0.72rem;color:#64748B">Fridge · Router · Lights · ~${BASELINE_KW} kW</div></div>
+      <div style="margin-left:auto;font-size:0.82rem;font-weight:700;color:#94A3B8">${avgCons.toFixed(2)} kW</div></div>`;
   } else {
-    // Show detected appliances
-    if (detected.length > 0) {
-      detected.forEach(ap => {
-        const barW = Math.round((ap.estKw / Math.max(avgCons, 1)) * 100);
-        html += `
-          <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid ${ap.colour}44;margin-bottom:6px;">
-            <span style="font-size:1.4rem">${ap.icon}</span>
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <span style="font-size:0.85rem;font-weight:600;color:#F1F5F9">${ap.name}</span>
-                <span style="font-size:0.82rem;font-weight:700;color:${ap.colour}">${ap.estKw.toFixed(2)} kW</span>
-              </div>
-              <div style="height:4px;background:#1E293B;border-radius:2px;overflow:hidden;">
-                <div style="height:100%;width:${barW}%;background:${ap.colour};border-radius:2px;"></div>
-              </div>
-              <div style="font-size:0.65rem;color:#475569;margin-top:3px;">Running ~${ap.consecutive * 5} min</div>
-            </div>
-          </div>`;
-      });
-    }
+    detected.forEach(ap => {
+      const barW = Math.round((ap.estKw / Math.max(avgCons, 1)) * 100);
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid ${ap.colour}44;margin-bottom:6px;">
+        <span style="font-size:1.4rem">${ap.icon}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="font-size:0.85rem;font-weight:600;color:#F1F5F9">${ap.name}</span>
+            <span style="font-size:0.82rem;font-weight:700;color:${ap.colour}">${ap.estKw.toFixed(2)} kW</span>
+          </div>
+          <div style="height:4px;background:#1E293B;border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${ap.colour};border-radius:2px;"></div>
+          </div>
+          <div style="font-size:0.65rem;color:#475569;margin-top:3px;">
+            Running ~${ap.consecutive * 5} min · ${ap.observations} observation${ap.observations !== 1 ? 's' : ''}${ap.lastSeen ? ` · last seen ${ap.lastSeen}` : ''}
+          </div>
+        </div></div>`;
+    });
 
-    // Always show baseline
-    html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:6px;">
-        <span style="font-size:1.1rem">🏠</span>
-        <div style="flex:1;">
-          <span style="font-size:0.78rem;color:#94A3B8">Baseline (fridge · router · lights)</span>
-        </div>
-        <span style="font-size:0.78rem;color:#64748B">${BASELINE_KW} kW</span>
-      </div>`;
+    html += `<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);margin-bottom:6px;">
+      <span style="font-size:1.1rem">🏠</span>
+      <div style="flex:1;"><span style="font-size:0.78rem;color:#94A3B8">Baseline (fridge · router · lights)</span></div>
+      <span style="font-size:0.78rem;color:#64748B">${BASELINE_KW} kW</span></div>`;
 
-    // Unidentified load
     const unidentified = Math.max(0, avgCons - accountedFor);
     if (unidentified > 0.2) {
-      html += `
-        <div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px dashed #334155;margin-bottom:6px;">
-          <span style="font-size:1.1rem">❓</span>
-          <div style="flex:1;">
-            <span style="font-size:0.78rem;color:#64748B">Unidentified load</span>
-          </div>
-          <span style="font-size:0.78rem;color:#475569">${unidentified.toFixed(2)} kW</span>
-        </div>`;
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px dashed #334155;margin-bottom:6px;">
+        <span style="font-size:1.1rem">❓</span>
+        <div style="flex:1;"><span style="font-size:0.78rem;color:#64748B">Unidentified load</span></div>
+        <span style="font-size:0.78rem;color:#475569">${unidentified.toFixed(2)} kW</span></div>`;
     }
 
-    // Total
-    html += `
-      <div style="display:flex;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border);margin-top:4px;">
-        <span style="font-size:0.78rem;font-weight:600;color:#94A3B8">Total consumption</span>
-        <span style="font-size:0.85rem;font-weight:700;color:#F1F5F9">${avgCons.toFixed(2)} kW</span>
-      </div>`;
+    html += `<div style="display:flex;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border);margin-top:4px;">
+      <span style="font-size:0.78rem;font-weight:600;color:#94A3B8">Total consumption</span>
+      <span style="font-size:0.85rem;font-weight:700;color:#F1F5F9">${avgCons.toFixed(2)} kW</span></div>`;
   }
 
   document.getElementById('applianceContent').innerHTML = html;
-
-  // Recalculate height if open
   if (applianceOpen) {
     const body = document.getElementById('applianceBody');
     body.style.maxHeight = body.scrollHeight + 100 + 'px';
   }
 }
+
+// ── Library UI ─────────────────────────────────────────────────────────────
+function renderApplianceLibrary() {
+  const fps    = APPLIANCE_FINGERPRINTS;
+  const events = nilmLoadEvents();
+
+  if (!fps.length) {
+    document.getElementById('libraryTable').innerHTML =
+      '<div style="color:#475569;font-size:0.78rem;padding:8px 0">No appliances added yet.</div>';
+    return;
+  }
+
+  // NILM stats bar
+  const totalEvents = events.length;
+  const lastEvent   = events.length
+    ? new Date(events[events.length-1].timestamp).toLocaleDateString('en-ZA', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})
+    : '—';
+  const statsHtml = `
+    <div style="font-size:0.65rem;color:#475569;margin-bottom:10px;padding:6px 10px;background:rgba(255,255,255,0.02);border-radius:5px;border:1px solid var(--border);">
+      📊 NILM database: <strong style="color:#94A3B8">${totalEvents} events logged</strong> · last: ${lastEvent}
+      ${totalEvents >= 5 ? `<span style="color:#10B981;cursor:pointer;margin-left:6px;" onclick="nilmRefineAndShow()">🔄 Refine fingerprints</span>` : ''}
+    </div>`;
+
+  const rows = fps.map((fp, i) => {
+    const fpEvents   = events.filter(e => e.name === fp.name);
+    const confidence = fpEvents.length >= 10 ? '🟢 High' : fpEvents.length >= 3 ? '🟡 Learning' : '🔴 New';
+    const lastSeen   = fp.lastSeen || '—';
+    const isActive   = fp.active !== false;
+
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
+      background:${isActive?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.2)'};
+      border:1px solid ${isActive?fp.colour+'55':'#1E293B'};
+      margin-bottom:6px;opacity:${isActive?'1':'0.45'};">
+      <span style="font-size:1.3rem;flex-shrink:0">${fp.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:0.82rem;font-weight:600;color:#F1F5F9">${fp.name}</span>
+          <span style="font-size:0.6rem;color:#64748B">${confidence}</span>
+          ${fpEvents.length>0?`<span style="font-size:0.6rem;color:#475569">${fpEvents.length} events</span>`:''}
+        </div>
+        <div style="font-size:0.65rem;color:#64748B;margin-top:1px;">
+          ${fp.minDelta.toFixed(1)}–${fp.maxDelta.toFixed(1)} kW
+          ${fp.timeWindow?` · ${fp.timeWindow.start}:00–${fp.timeWindow.end}:00`:''}
+          ${fp.cyclic?' · cyclic':' · steady'}
+          · last seen ${lastSeen}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${fp.colour}"></div>
+        <button onclick="toggleFingerprintActive(${i})" style="
+          background:${isActive?'#1E3A2F':'#1E293B'};border:1px solid ${isActive?'#10B981':'#334155'};
+          color:${isActive?'#10B981':'#475569'};border-radius:4px;padding:2px 7px;font-size:0.6rem;cursor:pointer;font-family:inherit;">
+          ${isActive?'On':'Off'}</button>
+        <button onclick="removeFingerprintAt(${i})" style="
+          background:#1E293B;border:1px solid #334155;color:#EF4444;
+          border-radius:4px;padding:2px 6px;font-size:0.6rem;cursor:pointer;font-family:inherit;">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('libraryTable').innerHTML = statsHtml + rows;
+  if (libraryOpen) {
+    const body = document.getElementById('libraryBody');
+    body.style.maxHeight = body.scrollHeight + 300 + 'px';
+  }
+}
+
+function nilmRefineAndShow() {
+  // Refine fingerprints using observed event history
+  const events = nilmLoadEvents();
+  APPLIANCE_FINGERPRINTS.forEach(fp => {
+    const fpEvents = events.filter(e => e.name === fp.name);
+    if (fpEvents.length < 3) return;
+    const kws = fpEvents.map(e => e.kw).sort((a,b) => a-b);
+    const p10 = kws[Math.floor(kws.length * 0.10)];
+    const p90 = kws[Math.floor(kws.length * 0.90)];
+    if (p10 > 0 && p90 > p10) {
+      fp.minDelta = parseFloat(((fp.minDelta * 0.7) + (p10 * 0.3)).toFixed(2));
+      fp.maxDelta = parseFloat(((fp.maxDelta * 0.7) + (p90 * 0.3)).toFixed(2));
+    }
+  });
+  nilmSave();
+  renderApplianceLibrary();
+}
+
+// ── Library accordion ──────────────────────────────────────────────────────
+let libraryOpen = false;
+function toggleApplianceLibrary() {
+  libraryOpen = !libraryOpen;
+  const body  = document.getElementById('libraryBody');
+  const arrow = document.getElementById('libraryArrow');
+  const hint  = document.getElementById('libraryHint');
+  if (libraryOpen) {
+    renderApplianceLibrary();
+    body.style.maxHeight = body.scrollHeight + 400 + 'px';
+    body.style.opacity   = '1';
+    arrow.innerHTML      = '⬆️';
+    hint.textContent     = 'tap to collapse';
+  } else {
+    body.style.maxHeight = '0';
+    body.style.opacity   = '0';
+    arrow.innerHTML      = 'ℹ️';
+    hint.textContent     = 'tap to expand';
+  }
+}
+
+// Initialise NILM on page load — synchronous localStorage version
+nilmLoad();
+
+
+
 
 
 let powerFlowOpen = false;
