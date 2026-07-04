@@ -1,6 +1,6 @@
 // sw.js — Solar Energy Monitor Service Worker
-const CACHE = 'solar-monitor-v3';
-const SHELL = ['./manifest.json'];
+const CACHE = 'solar-monitor-v4';  // bumped: forces fresh manifest.json fetch
+const SHELL = [];  // manifest.json removed — served network-first below
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -19,17 +19,19 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Always network-first for HTML and data — never serve stale versions
+  // Always network-first for HTML, data, and manifest
+  // (manifest must be fresh so PWA icon changes take effect immediately)
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('/') ||
-      url.pathname.includes('/data/')) {
+      url.pathname.includes('/data/') ||
+      url.pathname.endsWith('manifest.json')) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match(e.request))
     );
     return;
   }
 
-  // Cache-first for static assets (manifest, CDN libraries)
+  // Cache-first for CDN libraries and other static assets
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
