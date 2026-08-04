@@ -1055,7 +1055,7 @@
     <div style="background:#0F172A;border-radius:8px;padding:14px 16px" id="billingBreakdown"></div>
   </div>
 
-  <!-- ANNUAL MONTHLY SAVINGS (collapsed, opened via ℹ️ button) -->
+  <!-- ANNUAL MONTHLY SAVINGS -->
   <div class="insights-card" style="margin-top:16px" id="annualSavingsPanel">
     <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="toggleAnnualSavings()">
       <div class="insights-title" style="margin-bottom:0">📊 Annual Monthly Savings</div>
@@ -1064,21 +1064,19 @@
         <div id="annualSavingsArrow" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:transform 0.3s ease;flex-shrink:0;">ℹ️</div>
       </div>
     </div>
-    <div id="annualSavingsBody" style="max-height:0;overflow:hidden;transition:max-height 0.5s ease,opacity 0.3s ease;opacity:0;">
+    <div id="annualSavingsBody" style="max-height:0;overflow:hidden;transition:max-height 0.6s ease,opacity 0.3s ease;opacity:0;">
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-        <!-- Year filter -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
           <span style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Year</span>
           <div id="annualYearBtns" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          <div id="annualBackfillStatus" style="margin-left:auto;font-size:0.68rem;color:#475569;"></div>
         </div>
-        <!-- Legend / YTD summary -->
         <div id="annualSavingsLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 14px;background:#0F172A;border-radius:8px;font-size:0.75rem;"></div>
-        <!-- Chart -->
         <div style="position:relative;height:260px;">
           <canvas id="annualSavingsChart"></canvas>
         </div>
         <div style="margin-top:8px;font-size:0.68rem;color:#475569;text-align:center;">
-          Bars = monthly solar savings (R) · Line = avg daily sunshine hours · Seasonal UV pattern overlaid for context
+          Solid bars = actual monthly savings · Hatched = current month projected · Line = avg daily sunshine hours (Vereeniging)
         </div>
       </div>
     </div>
@@ -2519,9 +2517,11 @@ async function loadMonthlyBilling() {
 
   // Update projected savings widget
   document.getElementById('headerSavingsValue').textContent = formatRand(projSavingsCents);
-  // Persist this month's projected saving for Annual Monthly Savings chart
-  const _nowSAST = new Date(Date.now() + 120*60000);
-  persistMonthlySaving(_nowSAST.getUTCFullYear(), _nowSAST.getUTCMonth()+1, projSavingsCents/100);
+  // Persist projected saving for current month
+  (function(){
+    const _n = new Date(Date.now()+120*60000);
+    _persistMonthSaving(_n.getUTCFullYear(), _n.getUTCMonth()+1, projSavingsCents/100, true);
+  })();
   document.getElementById('headerSavingsSub').textContent =
     `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining · ${seasonLabel} rates · VAT incl`;
 
@@ -3674,130 +3674,225 @@ if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent
 // ============================================================
 let annualSavingsOpen = false;
 let annualSavingsChartObj = null;
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-// Climatological mean daily sunshine hours for Vereeniging (-26.7°S)
-const SUNSHINE_HOURS = [9.8, 9.2, 8.5, 7.8, 7.2, 6.8, 7.1, 7.9, 8.4, 9.0, 9.5, 9.9];
+const AMS_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// Climatological mean daily sunshine hours — Vereeniging (-26.7°S)
+const AMS_SUNSHINE = [9.8, 9.2, 8.5, 7.8, 7.2, 6.8, 7.1, 7.9, 8.4, 9.0, 9.5, 9.9];
+const AMS_STORAGE_KEY = 'solar_monthly_savings_v2';
 
-// localStorage key for persisting monthly savings history
-const SAVINGS_HISTORY_KEY = 'solar_monthly_savings_v1';
-
-function loadSavingsHistory() {
-  try { return JSON.parse(localStorage.getItem(SAVINGS_HISTORY_KEY) || '{}'); }
+// Each record: { saving: R (actual or projected), projected: bool }
+function _amsLoad() {
+  try { return JSON.parse(localStorage.getItem(AMS_STORAGE_KEY) || '{}'); }
   catch(e) { return {}; }
 }
-function saveSavingsHistory(h) {
-  try { localStorage.setItem(SAVINGS_HISTORY_KEY, JSON.stringify(h)); } catch(e) {}
+function _amsSave(h) {
+  try { localStorage.setItem(AMS_STORAGE_KEY, JSON.stringify(h)); } catch(e) {}
+}
+function _persistMonthSaving(year, month, savingRand, isProjected) {
+  const h = _amsLoad();
+  const k = year + '-' + String(month).padStart(2,'0');
+  // Don't overwrite a real (actual) value with a projection
+  if (h[k] && !h[k].projected && isProjected) return;
+  h[k] = { saving: savingRand, projected: !!isProjected };
+  _amsSave(h);
 }
 
-// Called from updateBillingEstimate — persists current month's projected savings
-function persistMonthlySaving(year, month, savingsRand) {
-  // month: 1-based
-  const h = loadSavingsHistory();
-  const key = year + '-' + String(month).padStart(2,'0');
-  h[key] = savingsRand;
-  saveSavingsHistory(h);
+// ── Back-fill: fetch all daily data files and compute actual monthly savings ──
+async function _amsBackfill() {
+  const statusEl = document.getElementById('annualBackfillStatus');
+  if (statusEl) statusEl.textContent = 'Loading historical data…';
+
+  // List all daily files via GitHub Pages directory listing
+  // We know the pattern: data/YYYY-MM-DD.json
+  // Fetch the data/ index to get all dates
+  let dates = [];
+  try {
+    const resp = await fetch('./data/');
+    const text = await resp.text();
+    // Parse filenames from directory listing HTML
+    const matches = [...text.matchAll(/href="(\d{4}-\d{2}-\d{2}\.json)"/g)];
+    dates = matches.map(m => m[1].replace('.json',''));
+  } catch(e) {
+    // Fallback: try the GitHub API
+    try {
+      const resp = await fetch('https://api.github.com/repos/lisboneagle/solar-monitor/contents/data');
+      const files = await resp.json();
+      if (Array.isArray(files)) {
+        dates = files
+          .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f.name))
+          .map(f => f.name.replace('.json',''));
+      }
+    } catch(e2) { console.warn('AMS backfill: could not list data files', e2); }
+  }
+
+  if (!dates.length) {
+    if (statusEl) statusEl.textContent = '';
+    return;
+  }
+
+  // Group dates by YYYY-MM
+  const byMonth = {};
+  dates.forEach(d => {
+    const ym = d.slice(0,7);
+    (byMonth[ym] = byMonth[ym] || []).push(d);
+  });
+
+  const h = _amsLoad();
+  const nowSAST = new Date(Date.now()+120*60000);
+  const currentYM = nowSAST.getUTCFullYear() + '-' + String(nowSAST.getUTCMonth()+1).padStart(2,'0');
+  let fetched = 0;
+
+  for (const [ym, days] of Object.entries(byMonth)) {
+    const isCurrentMonth = ym === currentYM;
+    // Skip current month — handled by live updateBillingEstimate
+    // Also skip months we already have real data for
+    if (isCurrentMonth) continue;
+    if (h[ym] && !h[ym].projected) continue; // already have actual value
+
+    // Fetch all day files for this month, aggregate
+    let totalGridKwh = 0, totalConsKwh = 0;
+    let successCount = 0;
+    for (const date of days) {
+      try {
+        const r = await fetch('./data/' + date + '.json');
+        if (!r.ok) continue;
+        const json = await r.json();
+        const rows = json.rows || [];
+        rows.forEach(row => {
+          totalGridKwh += Math.max(0, row.grid_kw || 0) * (5/60);
+          totalConsKwh += (row.consumption_kw || 0) * (5/60);
+        });
+        successCount++;
+      } catch(e) { /* skip failed files */ }
+    }
+    if (successCount === 0) continue;
+
+    // Determine tariff season for this month
+    const monthNum = parseInt(ym.split('-')[1]);
+    const isWinter = monthNum >= 6 && monthNum <= 8;
+    const tiers = isWinter ? TARIFF.winter : TARIFF.summer;
+
+    // Actual saving = cost if all consumption from grid − actual grid cost
+    const gridCostCents = calcTieredCost(totalGridKwh, tiers);
+    const noSolarCostCents = calcTieredCost(totalConsKwh, tiers);
+    const savingRand = Math.max(0, noSolarCostCents - gridCostCents) / 100;
+
+    _persistMonthSaving(parseInt(ym.split('-')[0]), monthNum, savingRand, false);
+    fetched++;
+    if (statusEl) statusEl.textContent = `Loaded ${fetched} month${fetched!==1?'s':''}…`;
+  }
+
+  if (statusEl) statusEl.textContent = fetched > 0 ? `✓ ${fetched} month${fetched!==1?'s':''} loaded` : '';
+  // Refresh chart with newly loaded data
+  const selBtn = document.querySelector('#annualYearBtns button[style*="A78BFA"]');
+  const selYear = selBtn ? parseInt(selBtn.textContent) : new Date().getFullYear();
+  _amsRenderChart(selYear);
 }
 
 function toggleAnnualSavings() {
   annualSavingsOpen = !annualSavingsOpen;
-  const body = document.getElementById('annualSavingsBody');
-  const hint = document.getElementById('annualSavingsHint');
+  const body  = document.getElementById('annualSavingsBody');
+  const hint  = document.getElementById('annualSavingsHint');
   const arrow = document.getElementById('annualSavingsArrow');
   if (annualSavingsOpen) {
-    body.style.maxHeight = '600px';
-    body.style.opacity = '1';
-    hint.textContent = 'tap to collapse';
+    body.style.maxHeight = '620px';
+    body.style.opacity   = '1';
+    hint.textContent     = 'tap to collapse';
     arrow.style.transform = 'rotate(180deg)';
-    renderAnnualSavingsChart();
+    _amsRenderChart();
+    _amsBackfill(); // async — fills in historical months
   } else {
     body.style.maxHeight = '0';
-    body.style.opacity = '0';
-    hint.textContent = 'tap to expand';
+    body.style.opacity   = '0';
+    hint.textContent     = 'tap to expand';
     arrow.style.transform = '';
   }
 }
 
-function renderAnnualSavingsChart(selectedYear) {
-  const history = loadSavingsHistory();
-  // Collect available years
-  const years = [...new Set(Object.keys(history).map(k => parseInt(k.split('-')[0])))].sort((a,b) => b-a);
-  // Add current year even if no data yet
-  const nowSAST = new Date(Date.now() + 120*60000);
+function _amsRenderChart(selectedYear) {
+  const h = _amsLoad();
+  const nowSAST = new Date(Date.now()+120*60000);
   const currentYear = nowSAST.getUTCFullYear();
-  if (!years.includes(currentYear)) years.unshift(currentYear);
+  const currentMonth = nowSAST.getUTCMonth(); // 0-based
 
+  const years = [...new Set(Object.keys(h).map(k => parseInt(k.split('-')[0])))].sort((a,b)=>b-a);
+  if (!years.includes(currentYear)) years.unshift(currentYear);
   selectedYear = selectedYear || years[0];
 
-  // Render year selector buttons
-  const btnContainer = document.getElementById('annualYearBtns');
-  btnContainer.innerHTML = years.map(y => `
-    <button onclick="renderAnnualSavingsChart(${y})"
+  // Year buttons
+  const btnEl = document.getElementById('annualYearBtns');
+  btnEl.innerHTML = years.map(y => `
+    <button onclick="_amsRenderChart(${y})"
       style="padding:4px 12px;border-radius:20px;border:1px solid ${y===selectedYear?'#A78BFA':'var(--border)'};
              background:${y===selectedYear?'rgba(167,139,250,0.15)':'transparent'};
-             color:${y===selectedYear?'#A78BFA':'var(--muted)'};font-size:0.75rem;cursor:pointer;">
+             color:${y===selectedYear?'#A78BFA':'var(--muted)'};font-size:0.75rem;cursor:pointer;transition:all 0.2s;">
       ${y}
     </button>`).join('');
 
-  // Build 12-month savings array for selected year
-  const savings = MONTH_NAMES.map((_, i) => {
-    const key = selectedYear + '-' + String(i+1).padStart(2,'0');
-    return history[key] != null ? history[key] : null;
+  // Build 12-month data
+  const months = AMS_MONTHS.map((_, i) => {
+    const k = selectedYear + '-' + String(i+1).padStart(2,'0');
+    return h[k] || null; // { saving, projected } or null
   });
 
-  // YTD total
-  const ytdTotal = savings.reduce((s, v) => s + (v || 0), 0);
-  const monthsWithData = savings.filter(v => v !== null).length;
-  const currentMonthIdx = selectedYear === currentYear ? nowSAST.getUTCMonth() : 11;
+  // YTD: sum actual months only (not projected current month for cleaner number)
+  const ytdActual = months.reduce((s,m) => s + (m && !m.projected ? m.saving : 0), 0);
+  const ytdIncProj = months.reduce((s,m) => s + (m ? m.saving : 0), 0);
+  const actualCount = months.filter(m => m && !m.projected).length;
 
   // Legend
-  const legendEl = document.getElementById('annualSavingsLegend');
-  legendEl.innerHTML = `
+  document.getElementById('annualSavingsLegend').innerHTML = `
     <div style="display:flex;align-items:center;gap:6px;">
-      <div style="width:12px;height:12px;background:#A78BFA;border-radius:2px;flex-shrink:0;"></div>
-      <span style="color:var(--text)">Monthly Saving</span>
+      <div style="width:14px;height:12px;background:#A78BFA;border-radius:2px;flex-shrink:0;"></div>
+      <span style="color:var(--text);font-size:0.72rem;">Actual saving</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div style="width:14px;height:12px;background:rgba(167,139,250,0.35);border:1px dashed #A78BFA;border-radius:2px;flex-shrink:0;"></div>
+      <span style="color:var(--text);font-size:0.72rem;">Projected (current month)</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;">
       <div style="width:20px;height:3px;background:#F59E0B;border-radius:2px;flex-shrink:0;"></div>
-      <span style="color:var(--text)">Sunshine hrs/day</span>
+      <span style="color:var(--text);font-size:0.72rem;">Sunshine hrs/day</span>
     </div>
-    <div style="margin-left:auto;padding-left:12px;border-left:1px solid var(--border);">
-      <span style="color:var(--muted)">YTD Savings </span>
-      <strong style="color:#A78BFA;font-size:0.9rem;">R ${ytdTotal.toFixed(2)}</strong>
-      ${monthsWithData > 0 ? '<span style="color:var(--muted);font-size:0.7rem;"> · ' + monthsWithData + ' month' + (monthsWithData!==1?'s':'') + ' recorded</span>' : ''}
+    <div style="margin-left:auto;padding-left:12px;border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
+      ${selectedYear===currentYear
+        ? `<span style="color:var(--muted);font-size:0.68rem;">YTD actual (${actualCount} month${actualCount!==1?'s':''})</span>
+           <strong style="color:#A78BFA;font-size:0.95rem;">R ${ytdActual.toFixed(2)}</strong>
+           ${months[currentMonth] ? '<span style="color:var(--muted);font-size:0.67rem;">incl. projection: R ' + ytdIncProj.toFixed(2) + '</span>' : ''}`
+        : `<span style="color:var(--muted);font-size:0.68rem;">Full year (${actualCount} month${actualCount!==1?'s':''})</span>
+           <strong style="color:#A78BFA;font-size:0.95rem;">R ${ytdActual.toFixed(2)}</strong>`
+      }
     </div>`;
 
-  // Chart
+  // Bar colours and border
+  const barBg    = months.map((m,i) => m && !m.projected ? 'rgba(167,139,250,0.85)' : m && m.projected ? 'rgba(167,139,250,0.30)' : 'rgba(71,85,105,0.2)');
+  const barBdr   = months.map((m,i) => m && !m.projected ? '#A78BFA'               : m && m.projected ? '#A78BFA'               : 'rgba(71,85,105,0.4)');
+  const barBdrW  = months.map((m)   => m && m.projected ? 1 : m ? 1 : 0);
+
   const ctx = document.getElementById('annualSavingsChart').getContext('2d');
   if (annualSavingsChartObj) { annualSavingsChartObj.destroy(); annualSavingsChartObj = null; }
-
-  // Bar colours: filled months purple, current month lighter, future months dim
-  const barColors = savings.map((v, i) => {
-    if (v !== null) return 'rgba(167,139,250,0.85)';
-    if (selectedYear === currentYear && i === currentMonthIdx) return 'rgba(167,139,250,0.35)';
-    return 'rgba(71,85,105,0.3)';
-  });
 
   annualSavingsChartObj = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: MONTH_NAMES,
+      labels: AMS_MONTHS,
       datasets: [
         {
           label: 'Solar Saving (R)',
-          data: savings.map(v => v !== null ? v : 0),
-          backgroundColor: barColors,
-          borderColor: savings.map((v,i) => v!==null ? 'rgba(167,139,250,1)' : 'rgba(71,85,105,0.5)'),
-          borderWidth: 1,
+          data: months.map(m => m ? m.saving : 0),
+          backgroundColor: barBg,
+          borderColor: barBdr,
+          borderWidth: barBdrW,
+          borderDash: months.map(m => m && m.projected ? [4,3] : []),
           borderRadius: 4,
           yAxisID: 'ySavings',
           order: 2,
         },
         {
           label: 'Sunshine hrs/day',
-          data: SUNSHINE_HOURS,
+          data: AMS_SUNSHINE,
           type: 'line',
           borderColor: '#F59E0B',
-          backgroundColor: 'rgba(245,158,11,0.08)',
+          backgroundColor: 'rgba(245,158,11,0.07)',
           borderWidth: 2,
           pointRadius: 3,
           pointBackgroundColor: '#F59E0B',
@@ -3811,58 +3906,38 @@ function renderAnnualSavingsChart(selectedYear) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode:'index', intersect:false },
       plugins: {
-        legend: { display: false },
+        legend: { display:false },
         tooltip: {
           callbacks: {
-            label: (ctx) => {
-              if (ctx.dataset.yAxisID === 'ySavings') {
-                const v = savings[ctx.dataIndex];
-                return v !== null
-                  ? ` Saving: R ${v.toFixed(2)}`
-                  : ctx.dataIndex === currentMonthIdx && selectedYear === currentYear
-                    ? ' Current month (in progress)'
-                    : ' No data';
+            label: (c) => {
+              if (c.dataset.yAxisID === 'ySavings') {
+                const m = months[c.dataIndex];
+                if (!m) return ' No data yet';
+                return (m.projected ? ' Projected: ' : ' Actual: ') + 'R ' + m.saving.toFixed(2);
               }
-              return ` Sunshine: ${SUNSHINE_HOURS[ctx.dataIndex]} hrs/day`;
+              return ' Sunshine: ' + AMS_SUNSHINE[c.dataIndex] + ' hrs/day';
             }
           },
-          backgroundColor: '#1E293B',
-          titleColor: '#F1F5F9',
-          bodyColor: '#94A3B8',
-          borderColor: '#334155',
-          borderWidth: 1,
+          backgroundColor:'#1E293B', titleColor:'#F1F5F9',
+          bodyColor:'#94A3B8', borderColor:'#334155', borderWidth:1,
         }
       },
       scales: {
-        x: {
-          grid: { color: 'rgba(51,65,85,0.5)' },
-          ticks: { color: '#94A3B8', font: { size: 11 } }
-        },
+        x: { grid:{ color:'rgba(51,65,85,0.5)' }, ticks:{ color:'#94A3B8', font:{size:11} } },
         ySavings: {
-          type: 'linear',
-          position: 'left',
-          grid: { color: 'rgba(51,65,85,0.5)' },
-          ticks: {
-            color: '#A78BFA',
-            font: { size: 11 },
-            callback: v => 'R ' + v.toFixed(0)
-          },
-          title: { display: true, text: 'Savings (R)', color: '#A78BFA', font: { size: 10 } }
+          type:'linear', position:'left',
+          grid:{ color:'rgba(51,65,85,0.5)' },
+          ticks:{ color:'#A78BFA', font:{size:11}, callback: v => 'R '+v.toFixed(0) },
+          title:{ display:true, text:'Savings (R)', color:'#A78BFA', font:{size:10} }
         },
         ySunshine: {
-          type: 'linear',
-          position: 'right',
-          min: 4,
-          max: 12,
-          grid: { drawOnChartArea: false },
-          ticks: {
-            color: '#F59E0B',
-            font: { size: 11 },
-            callback: v => v + 'h'
-          },
-          title: { display: true, text: 'Sunshine hrs', color: '#F59E0B', font: { size: 10 } }
+          type:'linear', position:'right',
+          min:4, max:12,
+          grid:{ drawOnChartArea:false },
+          ticks:{ color:'#F59E0B', font:{size:11}, callback: v => v+'h' },
+          title:{ display:true, text:'Sunshine hrs', color:'#F59E0B', font:{size:10} }
         }
       }
     }
