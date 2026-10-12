@@ -38,13 +38,28 @@ jobs:
           PHONE2  = os.environ["WHATSAPP_PHONE2"]
           APIKEY2 = os.environ["WHATSAPP_APIKEY2"]
 
+          # Read today's dated archive (written throughout the day by fetch script)
+          # Fallback to latest.json if dated file not found
+          today = datetime.date.today().isoformat()
+          dated_file = f"data/{today}.json"
           try:
-              with open("data/latest.json") as f:
+              with open(dated_file) as f:
                   data = json.load(f)
               rows = data.get("rows", [])
-              date = data.get("date", datetime.date.today().isoformat())
+              date = data.get("date", today)
+              print(f"📂 Reading {dated_file} ({len(rows)} rows)")
+          except FileNotFoundError:
+              print(f"⚠️  {dated_file} not found, falling back to latest.json")
+              try:
+                  with open("data/latest.json") as f:
+                      data = json.load(f)
+                  rows = data.get("rows", [])
+                  date = data.get("date", today)
+              except Exception as e:
+                  print(f"Could not read any data file: {e}")
+                  exit(1)
           except Exception as e:
-              print(f"Could not read latest.json: {e}")
+              print(f"Could not read {dated_file}: {e}")
               exit(1)
 
           if not rows:
@@ -54,8 +69,20 @@ jobs:
           INTERVAL_H = 5 / 60  # 5-minute intervals in hours
 
           # Calculate daily stats
+          # For consumption: use energy balance fallback when consumption_kw is zero/missing
+          # balance = pv + grid_import + battery_discharge - battery_charge
+          def row_consumption(r):
+              c = r.get("consumption_kw", 0)
+              if c and c > 0.05:
+                  return c
+              # Fallback: energy balance
+              pv  = r.get("pv_kw", 0) or 0
+              grid = r.get("grid_kw", 0) or 0
+              bat  = r.get("battery_kw", 0) or 0  # positive=discharge, negative=charge
+              return max(0, pv + max(0, grid) + bat)
+
           total_pv      = sum(r.get("pv_kw", 0)           for r in rows) * INTERVAL_H
-          total_cons    = sum(r.get("consumption_kw", 0)   for r in rows) * INTERVAL_H
+          total_cons    = sum(row_consumption(r)            for r in rows) * INTERVAL_H
           total_grid    = sum(max(0, r.get("grid_kw", 0))  for r in rows) * INTERVAL_H
           total_bat_dis = sum(r.get("battery_kw", 0) for r in rows if r.get("battery_kw", 0) > 0) * INTERVAL_H
           peak_pv       = max((r.get("pv_kw", 0) for r in rows), default=0)
