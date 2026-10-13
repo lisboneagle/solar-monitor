@@ -11,7 +11,9 @@ name: Notify — Daily Summary
 
 on:
   schedule:
-    # 19:00 UTC = 21:00 SAST
+    # 18:50 UTC = 20:50 SAST
+    - cron: "50 18 * * *"
+    # 19:00 UTC = 21:00 SAST (backup trigger)
     - cron: "0 19 * * *"
   workflow_dispatch:
 
@@ -23,7 +25,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check if already sent today
+        id: check
+        run: |
+          TODAY=$(date -u +%Y-%m-%d)
+          FLAG="data/.summary-sent-${TODAY}"
+          if [ -f "$FLAG" ]; then
+            echo "already_sent=true" >> $GITHUB_OUTPUT
+            echo "⏭️ Summary already sent today ($TODAY), skipping."
+          else
+            echo "already_sent=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and send daily summary
+        if: steps.check.outputs.already_sent == 'false'
         env:
           WHATSAPP_PHONE:  ${{ secrets.WHATSAPP_PHONE }}
           WHATSAPP_APIKEY: ${{ secrets.WHATSAPP_APIKEY }}
@@ -137,7 +152,24 @@ jobs:
               urllib.request.urlopen(url2)
               print("✅ Daily summary sent to second number")
               print(f"   PV: {total_pv:.1f} kWh | Grid: {total_grid:.1f} kWh | SOC: {current_soc}% | Savings: R{savings:.2f}")
+              # Write flag file so second trigger doesn't send again today
+              import pathlib
+              pathlib.Path(f"data/.summary-sent-{date}").touch()
+              print(f"🚩 Flag file written: data/.summary-sent-{date}")
           except Exception as e:
               print(f"Failed to send notification: {e}")
               exit(1)
           EOF
+
+      - name: Commit flag file
+        if: steps.check.outputs.already_sent == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TODAY=$(date -u +%Y-%m-%d)
+          FLAG="data/.summary-sent-${TODAY}"
+          if [ -f "$FLAG" ]; then
+            git add "$FLAG"
+            git diff --staged --quiet || git commit -m "chore: daily summary sent flag ${TODAY}"
+            git push
+          fi
