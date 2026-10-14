@@ -173,3 +173,4 @@ jobs:
             git diff --staged --quiet || git commit -m "chore: daily summary sent flag ${TODAY}"
             git push
           fi
+
