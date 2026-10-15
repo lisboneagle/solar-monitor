@@ -1,7 +1,8 @@
 # .github/workflows/notify-daily-summary.yml
 #
-# Sends a daily WhatsApp summary at 21:00 SAST (19:00 UTC)
-# with key solar stats for the day.
+# Sends a daily WhatsApp summary targeting ~21:00 SAST delivery.
+# Scheduled at 18:00 UTC (20:00 SAST) to allow for GitHub's typical
+# scheduler delays of 30–60 min on the free tier.
 #
 # Required GitHub Secrets:
 #   WHATSAPP_PHONE    Your phone number with country code
@@ -11,10 +12,8 @@ name: Notify — Daily Summary
 
 on:
   schedule:
-    # 18:50 UTC = 20:50 SAST
-    - cron: "50 18 * * *"
-    # 19:00 UTC = 21:00 SAST (backup trigger)
-    - cron: "0 19 * * *"
+    # 16:00 UTC = 18:00 SAST (target delivery ~21:00 SAST after typical 2–3hr GitHub delay)
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 jobs:
@@ -173,4 +172,3 @@ jobs:
             git diff --staged --quiet || git commit -m "chore: daily summary sent flag ${TODAY}"
             git push
           fi
-
